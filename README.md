@@ -47,11 +47,11 @@ $ curl --header "PRIVATE-TOKEN: <TOKEN" https://gitlab.com/api/v4/projects/82799
     "id": 86132274,
     "user": {
       "id": 4941123,
-      "name": "Scott Brumbaugh",
-      "username": "segfaulter",
+      "name": "Nobody",
+      "username": "nobody_username",
       "state": "active",
       "avatar_url": "https://secure.gravatar.com/avatar/aa00c8fa6a966ce402cf12c46ce9831e?s=80&d=identicon",
-      "web_url": "https://gitlab.com/segfaulter"
+      "web_url": "https://gitlab.com/nobody_username"
     },
     "created_at": "2021-02-09T16:59:37.783Z",
     "resource_type": "Issue",
@@ -70,11 +70,11 @@ $ curl --header "PRIVATE-TOKEN: <TOKEN" https://gitlab.com/api/v4/projects/82799
     "id": 86132509,
     "user": {
       "id": 4941123,
-      "name": "Scott Brumbaugh",
-      "username": "segfaulter",
+      "name": "Nobody",
+      "username": "nobody_username",
       "state": "active",
       "avatar_url": "https://secure.gravatar.com/avatar/aa00c8fa6a966ce402cf12c46ce9831e?s=80&d=identicon",
-      "web_url": "https://gitlab.com/segfaulter"
+      "web_url": "https://gitlab.com/nobody_username"
     },
     "created_at": "2021-02-09T17:00:49.416Z",
     "resource_type": "Issue",
@@ -93,15 +93,15 @@ $ curl --header "PRIVATE-TOKEN: <TOKEN" https://gitlab.com/api/v4/projects/82799
     "id": 86132510,
     "user": {
       "id": 4941123,
-      "name": "Scott Brumbaugh",
-      "username": "segfaulter",
+      "name": "Nobody",
+      "username": "nobody_username",
       "state": "active",
       "avatar_url": "https://secure.gravatar.com/avatar/aa00c8fa6a966ce402cf12c46ce9831e?s=80&d=identicon",
-      "web_url": "https://gitlab.com/segfaulter"
+      "web_url": "https://gitlab.com/nobody_username"
     },
     "created_at": "2021-02-09T17:00:49.416Z",
     "resource_type": "Issue",
-    "resource_id": 77308044,
+    "resource_id": 77308044,1
     "label": {
       "id": 18205357,
       "name": "workflow::Designing",
@@ -129,7 +129,7 @@ issues themselves via the opened\_at and closed\_at fields.
     "id": 80750993,
     "iid": 264,
     "project_id": 8279995,
-    "title": "Upgrade machine type of sass-vpc-production-beta cloudsql instances",
+    "title": "Upgrade machine type of cloudsql instances",
     "description": "..."
     "state": "opened",
     "created_at": "2021-03-11T19:24:21.913Z",
@@ -151,11 +151,11 @@ $ curl --header "PRIVATE-TOKEN: <TOKEN>" https://gitlab.com/api/v4/projects/8279
     "id": 25457645,
     "user": {
       "id": 2768090,
-      "name": "Tyson",
-      "username": "tysonholub",
+      "name": "Nobody",
+      "username": "nobody_username",
       "state": "active",
       "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/2768090/avatar.png",
-      "web_url": "https://gitlab.com/tysonholub"
+      "web_url": "https://gitlab.com/nobody_username"
     },
     "created_at": "2021-03-09T17:59:43.041Z",
     "resource_type": "Issue",
