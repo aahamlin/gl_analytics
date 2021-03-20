@@ -55,13 +55,24 @@ def build_http_response(status_code, bytes=None, headers=None):
         response.headers.update(headers)
     return response
 
+def test_issues_error():
+    assert isinstance(issues.IssuesError(), Exception)
+
 def test_abstract_session():
     with pytest.raises(issues.IssuesError):
         issues.Session().get()
 
+def test_abstract_request_factory():
+    with pytest.raises(issues.IssuesError):
+        issues.AbstractRequestFactory().get("foo")
+
+def test_abstract_repository():
+    with pytest.raises(issues.IssuesError):
+        issues.AbstractRepository().list()
+
 def test_gitlab_session():
-    s = issues.GitlabSession(access_token="x")
-    assert s != None
+    session = issues.GitlabSession(access_token="x")
+    assert session != None
 
 def test_gitlab_session_adds_access_token():
     fake = FakeRequestFactory()
@@ -69,8 +80,8 @@ def test_gitlab_session_adds_access_token():
         200,
         bytes=io.BytesIO(b'[{"id":8000234,"iid":2,"project_id":"8273019","title":"test title","created_at":"2021-03-09T17:59:43.041Z"}]')))
 
-    s = issues.GitlabSession(access_token="x", request_factory=fake)
-    s.get("https://gitlab.com/api/v4/groups/gozynta/issues")
+    session = issues.GitlabSession(access_token="x", request_factory=fake)
+    session.get("https://gitlab.com/api/v4/groups/gozynta/issues")
     assert 'PRIVATE-TOKEN' in fake.call_instances[-1].headers
 
 def test_repo_list_pagination():
@@ -88,60 +99,40 @@ def test_repo_list_pagination():
 
     resp.append(build_http_response(
         200,
-        bytes=io.BytesIO(b'[]')))
-
-    resp.append(build_http_response(
-        200,
         headers={'link': '<https://gitlab.com/api/v4/groups/gozynta/issues?id=gozynta&milestone=mb_v1.3&non_archived=true&order_by=created_at&page=1&pagination=keyset&per_page=5&sort=desc&state=all&with_labels_details=false>; rel="first", <https://gitlab.com/api/v4/groups/gozynta/issues?id=gozynta&milestone=mb_v1.3&non_archived=true&order_by=created_at&page=9&pagination=keyset&per_page=5&sort=desc&state=all&with_labels_details=false>; rel="last"'},
         bytes=io.BytesIO(b'[{"id":8000235, "iid":3,"project_id":"8273019","title":"test title 2","created_at":"2021-03-09T17:59:43.041Z"}]')))
 
-    resp.append(build_http_response(
-        200,
-        bytes=io.BytesIO(b'[]')))
-
-
     fake = FakeRequestFactory()
     fake.responses = resp
-    s = issues.GitlabSession(access_token="x", request_factory=fake)
+    session = issues.GitlabSession(access_token="x", request_factory=fake)
 
-    repo = issues.GitlabIssuesRepository(session=s, group="gozynta", milestone="mb_v1.3")
+    repo = issues.GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3")
     issue_list = repo.list()
 
-    assert len(fake.call_instances) == 4
-    assert fake.call_instances[-2].path == "/api/v4/groups/gozynta/issues"
-    assert 'pagination' in fake.call_instances[-2].params
-    assert 'milestone' in fake.call_instances[-2].params
-    assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/3/resource_label_events"
+    assert len(fake.call_instances) == 2
+    assert fake.call_instances[-1].path == "/api/v4/groups/gozynta/issues"
+    assert 'pagination' in fake.call_instances[-1].params
+    assert 'milestone' in fake.call_instances[-1].params
 
     assert len(issue_list) == 2
     assert issue_list[0] and issue_list[0].issue_id == 2
     assert issue_list[1] and issue_list[1].issue_id == 3
 
 
-def test_issue_label_repo_list():
+def test_workflow_history():
 
-    resp = []
-    resp.append(build_http_response(
-        200,
-        bytes=io.BytesIO(b'[{"id":8000235, "iid":3,"project_id":"8273019","title":"test title 2","created_at":"2021-03-09T17:59:43.041Z"}]')))
-    resp.append(build_http_response(
+    fake = FakeRequestFactory()
+    fake.responses.append(build_http_response(
         status_code=200,
         # XXX load payload from string to bytes more easily...
         bytes=io.BytesIO(b'[{"created_at": "2021-02-09T16:59:37.783Z","resource_type": "Issue","label":{"id": 18205357,"name": "workflow::Designing"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205410,"name": "workflow::In Progress"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205357,"name": "workflow::Designing"},"action": "remove"}]')))
 
-    fake = FakeRequestFactory()
-    fake.responses = resp
-    s = issues.GitlabSession(access_token="x", request_factory=fake)
+    session = issues.GitlabSession(access_token="x", request_factory=fake)
 
-    repo = issues.GitlabIssuesRepository(session=s, group="gozynta", milestone="mb_v1.3")
-    issue_list = repo.list()
+    issues_list = []
+    issues_list.append(issues.Issue({'iid': 3, 'project_id': '8273019', 'created_at': '2021-02-09T16:59:37.783Z' }))
 
-    assert len(fake.call_instances) == 2
-    assert fake.call_instances[-2].path == "/api/v4/groups/gozynta/issues"
-    assert 'pagination' in fake.call_instances[-2].params
-    assert 'milestone' in fake.call_instances[-2].params
+    histogram = issues.WorkflowHistogram(session, issues=issues_list)
+    histogram.build_history()
+    
     assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/3/resource_label_events"
-
-    assert len(issue_list) == 1
-    issue = issue_list[0]
-    assert len(issue.labels) == 3

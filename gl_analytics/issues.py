@@ -3,6 +3,8 @@
 
 import json
 import requests
+import datetime
+from dateutil import parser as dateparser
 from urllib.parse import urlencode
 
 GITLAB_URL_BASE = "https://gitlab.com/api/v4"
@@ -47,7 +49,7 @@ class GitlabIssuesRepository(AbstractRepository):
     If ever we needed it, an AbstractRepository could be extracted.
     """
 
-    def __init__(self, session=None, group=None, milestone=None):
+    def __init__(self, session, group=None, milestone=None):
         """Initialize a repository.
        """
         self._session = session
@@ -87,10 +89,10 @@ class GitlabIssuesRepository(AbstractRepository):
 
             # extract the issues from the response body
             payload = r1.json()
-            count = len(payload)
+            #count = len(payload)
             #print(f'processing {count} items');
             for item in payload:
-                yield self._load_issue(item)
+                yield Issue(item)
 
             if r1.links and 'next' in r1.links:
                 # setup next page request
@@ -100,29 +102,54 @@ class GitlabIssuesRepository(AbstractRepository):
             else:
                 hasMore = False
 
-    def _build_issue_label_request_url(self, project_id, issue_id):
-        # /api/v4/projects/8279995/issues/191/resource_label_events
-        url = "{0}/projects/{1}/issues/{2}/resource_label_events".format(
-            GITLAB_URL_BASE, project_id, issue_id)
-        return url
+class WorkflowHistogram(object):
 
-    def _load_issue(self, item):
-        issue = Issue(item)
+    def __init__(self, session, issues=[]):
+        self._session = session
+        self._issues = issues
+
+    @property
+    def issues(self):
+        return self._issues
+
+    def build_history(self):
+        for issue in self.issues:
+            events = self._load_issue(issue)
+
+    def _load_issue(self, issue):
+        events = []
+
         url = self._build_issue_label_request_url(issue.project_id, issue.issue_id)
         r = self._session.get(url)
         r.raise_for_status()
 
         payload = r.json()
         #print(f'processing label events: {payload}')
-        # action: add, remove
-        # created_at: datetime
-        # label.name
-        # label.id
         for event in payload:
             #print('Payload event', json.dumps(event))
-            issue.labels.append({'action': event['action'], 'datetime': event['created_at'], 'step': event['label']['name']})
+            events.append(self._add_workflow_step(event))
 
-        return issue
+        return events
+
+
+    def _build_issue_label_request_url(self, project_id, issue_id):
+        # /api/v4/projects/8279995/issues/191/resource_label_events
+        url = "{0}/projects/{1}/issues/{2}/resource_label_events".format(
+            GITLAB_URL_BASE, project_id, issue_id)
+        return url
+
+
+    def _add_workflow_step(self, event):
+        if 'label' not in event and not event['label']['name'].startswith('workflow::'):
+            return
+
+        workflow_step = event['label']['name']
+        workflow_action = event['action']
+        workflow_datetime = dateparser.parse(event['created_at'])
+        workflow_step_id = event['label']['id']
+
+        return workflow_action, workflow_datetime, workflow_step_id, workflow_step
+
 
 class Issue(object):
 
@@ -130,9 +157,9 @@ class Issue(object):
         #print('creating Issue from item', json.dumps(item))
         self._issue_id = item['iid']
         self._project_id = item['project_id']
-        self._opened_at = item['created_at']
-        self._closed_at = item.get('closed_at')
-        self._label_events = []
+        self._opened_at = dateparser.parse(item['created_at'])
+        closed_at = item.get('closed_at')
+        self._closed_at = dateparser.parse(closed_at) if closed_at else None
 
     @property
     def issue_id(self):
@@ -150,9 +177,5 @@ class Issue(object):
     def closed_at(self):
         return self._closed_at
 
-    @property
-    def labels(self):
-        return self._label_events
-
     def __str__(self):
-        return f"Issue(id:{self.issue_id}, p:{self.project_id}, o:{self.opened_at}, c:{self.closed_at}, l:{self.labels})"
+        return f"Issue(id:{self.issue_id}, p:{self.project_id}, o:{self.opened_at}, c:{self.closed_at})"
