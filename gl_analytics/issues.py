@@ -1,6 +1,7 @@
 """ Issues module interacts with a backend system API, e.g. GitLab.
 """
 
+import json
 import requests
 from urllib.parse import urlencode
 
@@ -40,7 +41,7 @@ class AbstractRepository(object):
     def list(self):
         raise IssuesError()
 
-class GroupIssuesRepository(AbstractRepository):
+class GitlabIssuesRepository(AbstractRepository):
     """This is specifically a GitLab Issue repository. Current GitLab version is 13.11.0-pre.
 
     If ever we needed it, an AbstractRepository could be extracted.
@@ -87,9 +88,9 @@ class GroupIssuesRepository(AbstractRepository):
             # extract the issues from the response body
             payload = r1.json()
             count = len(payload)
-            print(f'processing {count} items');
+            #print(f'processing {count} items');
             for item in payload:
-                yield Issue(item)
+                yield self._load_issue(item)
 
             if r1.links and 'next' in r1.links:
                 # setup next page request
@@ -99,14 +100,39 @@ class GroupIssuesRepository(AbstractRepository):
             else:
                 hasMore = False
 
+    def _build_issue_label_request_url(self, project_id, issue_id):
+        # /api/v4/projects/8279995/issues/191/resource_label_events
+        url = "{0}/projects/{1}/issues/{2}/resource_label_events".format(
+            GITLAB_URL_BASE, project_id, issue_id)
+        return url
+
+    def _load_issue(self, item):
+        issue = Issue(item)
+        url = self._build_issue_label_request_url(issue.project_id, issue.issue_id)
+        r = self._session.get(url)
+        r.raise_for_status()
+
+        payload = r.json()
+        #print(f'processing label events: {payload}')
+        # action: add, remove
+        # created_at: datetime
+        # label.name
+        # label.id
+        for event in payload:
+            #print('Payload event', json.dumps(event))
+            issue.labels.append({'action': event['action'], 'datetime': event['created_at'], 'step': event['label']['name']})
+
+        return issue
+
 class Issue(object):
 
     def __init__(self, item):
-
+        #print('creating Issue from item', json.dumps(item))
         self._issue_id = item['iid']
         self._project_id = item['project_id']
-        self._opened_at = item['opened_at']
+        self._opened_at = item['created_at']
         self._closed_at = item.get('closed_at')
+        self._label_events = []
 
     @property
     def issue_id(self):
@@ -118,43 +144,15 @@ class Issue(object):
 
     @property
     def opened_at(self):
-        self._opened_at
+        return self._opened_at
 
     @property
     def closed_at(self):
-        self._closed_at
-
-class IssueLabelRepository(AbstractRepository):
-
-    def __init__(self, session=None, issue=None):
-        self._session = session
-        self._issue = issue
-        self._url = self._build_request_url()
+        return self._closed_at
 
     @property
-    def url(self):
-        return self._url
+    def labels(self):
+        return self._label_events
 
-    def list(self):
-        return [x for x in self._label_events()]
-
-    def _build_request_url(self):
-        # /api/v4/projects/8279995/issues/191/resource_label_events
-        url = "{0}/projects/{1}/issues/{2}/resource_label_events".format(
-            GITLAB_URL_BASE, self._issue.project_id, self._issue.issue_id)
-        return url
-
-    def _label_events(self):
-
-        url = self.url
-        r = self._session.get(url)
-        r.raise_for_status()
-
-        payload = r.json()
-        print(f'processing label events: {payload}')
-        # action: add, remove
-        # created_at: datetime
-        # label.name
-        # label.id
-        for event in payload:
-            yield {'action': event['action'], 'datetime': event['created_at'], 'step': event['label']['name']}
+    def __str__(self):
+        return f"Issue(id:{self.issue_id}, p:{self.project_id}, o:{self.opened_at}, c:{self.closed_at}, l:{self.labels})"
