@@ -111,7 +111,10 @@ class GitlabIssuesRepository(AbstractRepository):
                 hasMore = False
 
 class GitlabIssueLabelsRepository(AbstractRepository):
+    """List workflow events for an issue.
 
+    Workflow events are an array of tuples. But should probably be changed to an object.
+    """
     def __init__(self, session, issue=None):
 
         if not issue:
@@ -145,10 +148,9 @@ class GitlabIssueLabelsRepository(AbstractRepository):
     def _fetch_results(self):
         """Collect steps of the workflow for this issue.
         """
-        # XXX steps are ordered and known in advance??
         # XXX how to manage the datetime values? truncate to a date or keep time as well?
 
-        # every workflow starts and ends with 'opened'
+        # every workflow starts with 'opened'
         events = []
         events.append(('add', 'opened', self.issue.opened_at))
         hanging_open = True
@@ -168,12 +170,17 @@ class GitlabIssueLabelsRepository(AbstractRepository):
             except TypeError:
                 pass
 
+        # closed issues will end with 'closed'
         if self.issue.closed_at:
             print('events before close', events)
             # XXX find last 'add' event
-            last_action, last_step_name, last_action_date = events[-2]
-            events.append(('add', 'closed', self.issue.closed_at))
-            events.append(('remove', last_step_name, self.issue.closed_at))
+            try:
+                prev_add = next(filter(lambda a: a[0] == 'add', reversed(events)))
+                events.append(('add', 'closed', self.issue.closed_at))
+                _, last_name, _ = prev_add
+                events.append(('remove', last_name, self.issue.closed_at))
+            except StopIteration:
+                events.append(('add', 'closed', self.issue.closed_at))
 
         return events
 

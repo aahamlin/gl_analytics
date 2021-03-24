@@ -139,7 +139,7 @@ def test_repo_list_opened():
 
     labels = issues.GitlabIssueLabelsRepository(session, issue)
     labelEvents = labels.list()
-    print(labelEvents)
+    #print(labelEvents)
 
     assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/3/resource_label_events"
     assert labelEvents[0] == ('add', 'opened', issue.opened_at)
@@ -159,7 +159,7 @@ def test_repo_list_closed():
 
     labels = issues.GitlabIssueLabelsRepository(session, issue)
     labelEvents = labels.list()
-    print(labelEvents)
+    #print(labelEvents)
 
     assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/3/resource_label_events"
     assert labelEvents[-2] == ('add', 'closed', issue.closed_at)
