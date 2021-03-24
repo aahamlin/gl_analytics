@@ -55,12 +55,6 @@ def build_http_response(status_code, bytes=None, headers=None):
         response.headers.update(headers)
     return response
 
-def test_daterange_exclusive():
-    d1 = datetime.date(2021, 3, 1)
-    d2 = datetime.date(2021, 3, 5)
-    dates = [d for d in issues.daterange(d1, d2)]
-    assert dates[-1] == datetime.date(2021, 3, 4)
-
 def test_issues_error():
     assert isinstance(issues.IssuesError(), Exception)
 
@@ -137,7 +131,7 @@ def test_repo_list_opened():
 
     issue =issues.Issue({'iid': 3, 'project_id': '8273019', 'created_at': '2021-02-09T16:59:37.783Z' })
 
-    labels = issues.GitlabIssueLabelsRepository(session, issue)
+    labels = issues.GitlabIssueWorkflowRepository(session, issue)
     labelEvents = labels.list()
     #print(labelEvents)
 
@@ -157,9 +151,9 @@ def test_repo_list_closed():
 
     issue =issues.Issue({'iid': 3, 'project_id': '8273019', 'created_at': '2021-02-09T16:59:37.783Z', 'closed_at': '2021-02-15T00:00:00.000Z' })
 
-    labels = issues.GitlabIssueLabelsRepository(session, issue)
+    labels = issues.GitlabIssueWorkflowRepository(session, issue)
     labelEvents = labels.list()
-    #print(labelEvents)
+
 
     assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/3/resource_label_events"
     assert labelEvents[-2] == ('add', 'closed', issue.closed_at)
