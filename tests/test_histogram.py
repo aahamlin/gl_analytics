@@ -3,58 +3,24 @@ import datetime
 import pandas as pd
 
 from random import randrange
-from gl_analytics.issues import daterange
+from gl_analytics.issues import daterange, workflow_series
 
-def test_pandas_table():
-    dates = [d for d in daterange(datetime.date(2021,3,15), datetime.date(2021,3,21))]
-    data = {
+dates = [d for d in daterange(datetime.date(2021, 3, 15), datetime.date(2021, 3, 21))]
 
-        'Todo': [randrange(10) for _ in range(len(dates))],
-        'InProgress': [randrange(10) for _ in range(len(dates))],
-        'CodReview': [3, 5, None, 7, None, 2],
-        'Done': [randrange(10) for _ in range(len(dates))]
-    }
+# series of workflow steps
+series = ['todo','inprogress','review','done']
 
-    df = pd.DataFrame(data, index=[str(d) for d in dates])
-    filled = df.fillna(value=1, axis=1)
 
-    print(df.to_csv())
-    # ,Todo,InProgress,CodReview,Done
-    # 2021-03-15,0,5,3.0,8
-    # 2021-03-16,5,9,5.0,4
-    # 2021-03-17,2,2,,0
-    # 2021-03-18,7,6,7.0,1
-    # 2021-03-19,9,8,,6
-    # 2021-03-20,8,8,2.0,1
-    assert True
-
-def test_collect_values():
-    dates = [d for d in daterange(datetime.date(2021,3,15), datetime.date(2021,3,21))]
-    e1 = [
-        ('add', 'todo', dates[0]),
-        ('add', 'inprogress',dates[1]),
-        ('remove', 'todo', dates[1]),
-        ('add', 'done', dates[-1]),
-        ('remove', 'inprogress',dates[-1])
-    ]
-    e2 = [
-        ('add', 'todo', dates[1]),
-        ('add', 'inprogress',dates[3]),
-        ('remove', 'todo', dates[3]),
-        ('add', 'review', dates[4]),
-        ('remove', 'inprogress',dates[4])
-    ]
-    # series of workflow steps
-    series = ['todo','inprogress','review','done']
-
-    # empty 2D list
+def build_data_frame(events_list):
+    # Build a dataframe from each event history and concat them together
+    # store each label in series key, build start and end range by 'add' and 'remove'
+        # empty 2D list
+    # XXX Pandas must provide a way to build a series skipping indexes?
+    # XXX try concatenating 2 data frames?
     series_buckets = [[0 for _ in dates] for _ in series]
 
-
-    # assumptions: 2 events added on same day == last occuring event of the day
-
     # goal: calculate the range of each step, then fill in the series accordingly.
-    for eventhistory in [e1, e2]:
+    for eventhistory in events_list:
         # store each label in series key, build start and end range by 'add' and 'remove'
         range_of_labels = {}
         for action, label, date in eventhistory:
@@ -78,7 +44,68 @@ def test_collect_values():
 
     # index = the daterange of the time window
     data = {k:v for k, v in zip(series, series_buckets)}
-    df = pd.DataFrame(data, index=[str(d) for d in dates], columns=series)
+    indexes = [str(d) for d in dates]
+    df = pd.DataFrame(data, index=indexes, columns=series)
+
+    return df
+
+
+def test_collect_values():
+    events = []
+    events.append([
+        ('add', 'todo', dates[0]),
+        ('add', 'inprogress',dates[1]),
+        ('remove', 'todo', dates[1]),
+        ('add', 'done', dates[-1]),
+        ('remove', 'inprogress',dates[-1])
+    ])
+    events.append([
+        ('add', 'todo', dates[1]),
+        ('add', 'inprogress',dates[3]),
+        ('remove', 'todo', dates[3]),
+        ('add', 'review', dates[4]),
+        ('remove', 'inprogress',dates[4])
+    ])
+
+    df = build_data_frame(events)
+    print(df.to_csv())
+    #            todo  inprogress  review  done
+    #2021-03-15     1           0       0     0
+    #2021-03-16     1           1       0     0
+    #2021-03-17     1           1       0     0
+    #2021-03-18     0           2       0     0
+    #2021-03-19     0           1       1     0
+    #2021-03-20     0           0       1     1
+
+    # access various data
+    # print(df['inprogress'])
+    assert len(df["inprogress"].array) == 6
+    assert all([a == b for a, b in zip(df["inprogress"].array, [0, 1, 1, 2, 1, 0])])
+    assert df.at["2021-03-18", "inprogress"] == 2
+    assert df.iloc[0, 0] == 1
+    assert df.loc["2021-03-15", "todo"] == 1
+    assert df.iloc[5, 3] == 1
+    assert df.loc["2021-03-20", "done"] == 1
+    #print(df.loc[str(date[-1])])
+    #assert df.loc[str(date[-1])] == [0, 0, 1, 1]
+
+def test_events_on_same_day_record_last_event():
+    """Test that 2 events added on same day == last occuring event of the day.
+    """
+    events = []
+    events.append([
+        ('add', 'todo', dates[1]),
+        ('add', 'inprogress',dates[1]),
+        ('remove', 'todo', dates[1]),
+        ('add', 'review', dates[1]),
+        ('remove', 'inprogress',dates[1])
+    ])
+
+    df = build_data_frame(events)
     print(df.to_csv())
 
-    assert False
+    assert len(df["todo"].array) == 6
+    assert all([a == b for a, b in zip(df["todo"].array, [0, 0, 0, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["inprogress"].array, [0, 0, 0, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["review"].array, [0, 1, 1, 1, 1, 1])])
+    assert all([a == b for a, b in zip(df["done"].array, [0, 0, 0, 0, 0, 0])])
