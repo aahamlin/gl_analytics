@@ -1,6 +1,7 @@
 import pytest
 import io
 import datetime
+from dateutil import parser as date_parser
 from urllib.parse import urlparse, parse_qs
 from requests import Response
 
@@ -124,7 +125,7 @@ def test_repo_list_pagination():
     assert issue_list[1] and issue_list[1].issue_id == 3
 
 
-def skip_test_workflow_history():
+def test_repo_list_opened():
 
     fake = FakeRequestFactory()
     fake.responses.append(build_http_response(
@@ -134,10 +135,32 @@ def skip_test_workflow_history():
 
     session = issues.GitlabSession(access_token="x", request_factory=fake)
 
-    issues_list = []
-    issues_list.append(issues.Issue({'iid': 3, 'project_id': '8273019', 'created_at': '2021-02-09T16:59:37.783Z' }))
+    issue =issues.Issue({'iid': 3, 'project_id': '8273019', 'created_at': '2021-02-09T16:59:37.783Z' })
 
-    histogram = issues.WorkflowHistogram(session, issues=issues_list)
-    histogram.build_history()
+    labels = issues.GitlabIssueLabelsRepository(session, issue)
+    labelEvents = labels.list()
+    print(labelEvents)
 
     assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/3/resource_label_events"
+    assert labelEvents[0] == ('add', 'opened', issue.opened_at)
+    assert labelEvents[2] == ('remove', 'opened', date_parser.parse("2021-02-09T16:59:37.783Z"))
+
+def test_repo_list_closed():
+
+    fake = FakeRequestFactory()
+    fake.responses.append(build_http_response(
+        status_code=200,
+        # XXX load payload from string to bytes more easily...
+        bytes=io.BytesIO(b'[{"created_at": "2021-02-09T16:59:37.783Z","resource_type": "Issue","label":{"id": 18205357,"name": "workflow::Designing"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205410,"name": "workflow::In Progress"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205357,"name": "workflow::Designing"},"action": "remove"}]')))
+
+    session = issues.GitlabSession(access_token="x", request_factory=fake)
+
+    issue =issues.Issue({'iid': 3, 'project_id': '8273019', 'created_at': '2021-02-09T16:59:37.783Z', 'closed_at': '2021-02-15T00:00:00.000Z' })
+
+    labels = issues.GitlabIssueLabelsRepository(session, issue)
+    labelEvents = labels.list()
+    print(labelEvents)
+
+    assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/3/resource_label_events"
+    assert labelEvents[-2] == ('add', 'closed', issue.closed_at)
+    assert labelEvents[-1] == ('remove', 'workflow::In Progress', issue.closed_at)

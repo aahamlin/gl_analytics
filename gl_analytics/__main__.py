@@ -1,7 +1,7 @@
 
 import os
 from dotenv import load_dotenv
-from .issues import GitlabSession, GitlabIssuesRepository, WorkflowHistogram
+from .issues import GitlabSession, GitlabIssuesRepository, GitlabIssueLabelsRepository
 
 
 if __name__ == "__main__":
@@ -11,6 +11,6 @@ if __name__ == "__main__":
     repo = GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3")
     issues = repo.list()
 
-    histogram = WorkflowHistogram(session, issues=issues)
-    for issue in histogram.issues:
-        print(str(issue))
+    for issue in issues:
+        labels = GitlabIssueLabelsRepository(session, issue)
+        print(labels.list())

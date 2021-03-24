@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 
 from random import randrange
-from gl_analytics.issues import daterange, workflow_series
+from gl_analytics.issues import daterange
 
 dates = [d for d in daterange(datetime.date(2021, 3, 15), datetime.date(2021, 3, 21))]
 

@@ -57,6 +57,9 @@ class GitlabIssuesRepository(AbstractRepository):
     def __init__(self, session, group=None, milestone=None):
         """Initialize a repository.
        """
+        if not group or not milestone:
+            raise SyntaxError('Requires group and milestone')
+
         self._session = session
         self._group = group
         self._milestone = milestone
@@ -107,113 +110,86 @@ class GitlabIssuesRepository(AbstractRepository):
             else:
                 hasMore = False
 
-class WorkflowHistogram(object):
+class GitlabIssueLabelsRepository(AbstractRepository):
 
-    def __init__(self, session, issues=[], labels=[]):
+    def __init__(self, session, issue=None):
+
+        if not issue:
+            raise SyntaxError('Requires issue')
+
         self._session = session
-        self._issues = issues
-
-        # XXX query API to retrieve labels dynamically?
-        # expect ordered list of names to match
-        self._labels = ['open'] + labels + ['close']
-        self._matrix = {}
-
+        self._issue = issue
+        self._url = self._build_request_url(issue.project_id, issue.issue_id)
 
     @property
-    def issues(self):
-        return self._issues
+    def issue(self):
+        return self._issue
 
-    def build_history(self):
-        for issue in self.issues:
-            self._update_matrix(issue)
+    @property
+    def url(self):
+        return self._url
 
-    def _update_matrix(self, issue):
-        # loop through steps and increment dates of columns
-        steps = self._load_issue_steps(issue)
-        last_start = issue.opened_at.date()
-        for step, datespan in steps.items():
-            # XXX how should I do this?
-            # Histogram could have date range?
-            # fill in last col_index up to this start_date
-            col_index = self._labels.index(step)
-            start_date, end_date = datespan
-            if col_index > 0:
-                # incement from last_start to start_Date
-                for d in daterange(last_start+1, start_date):
-                    self._increment(col_index-1, d)
-            self._increment(col_index, start_date)
+    def list(self):
+        """Return label event from the repository.
 
-    def _increment(self, col_index, start_date):
-        if start_date not in self._matrix:
-            self._matrix[start_date] = self._empty_values()
+       Events array items are tuples: 'action', 'worflowStep', 'date'
+       """
+        return [x for x in self._fetch_results()]
 
-        val = self._matrix[start_date][col_index]
-        val += 1
-        self._matrix[start_date][col_index] = val
-
-    def _empty_values(self):
-         return tuple(0 for _ in self._labels)
-
-    def _load_issue_steps(self, issue):
-        """Steps of workflow.
-
-        dict object key is step label, values are start (and end) dates.
-        `{
-          'workflow::Ready': (datetime.date(2021, 3, 15), )
-        }`
-        """
-        steps = {}
-
-        url = self._build_issue_label_request_url(issue.project_id, issue.issue_id)
-        r = self._session.get(url)
-        r.raise_for_status()
-
-        start_date = issue.opened_at.date()
-        end_date = issue.closed_at.date() if issue.closed_at else datetime.date.max
-
-        steps[self._labels[0]] = (start_date,) # open
-        steps[self._labels[-1]] = (end_date,)  # close
-
-        payload = r.json()
-        #print(f'processing label events: {payload}')
-        for event in payload:
-            #print('Payload event', json.dumps(event))
-            try:
-                action, step_name, action_date = self._add_workflow_step(event)
-                if step_name not in steps:
-                    steps[step_name] = (datetime.date.max, datetime.date.max)
-
-                d1, d2 = steps[step_name]
-                if action == "add":
-                    steps[step_name] = (action_date, d2)
-                elif action == "remove":
-                    steps[step_name] = (d1, action_date)
-            except TypeError:
-                pass
-
-        print('Issue steps', steps)
-        return steps
-
-
-    def _build_issue_label_request_url(self, project_id, issue_id):
+    def _build_request_url(self, project_id, issue_id):
         # /api/v4/projects/8279995/issues/191/resource_label_events
         url = "{0}/projects/{1}/issues/{2}/resource_label_events".format(
             GITLAB_URL_BASE, project_id, issue_id)
         return url
 
+    def _fetch_results(self):
+        """Collect steps of the workflow for this issue.
+        """
+        # XXX steps are ordered and known in advance??
+        # XXX how to manage the datetime values? truncate to a date or keep time as well?
+
+        # every workflow starts and ends with 'opened'
+        events = []
+        events.append(('add', 'opened', self.issue.opened_at))
+        hanging_open = True
+
+        r = self._session.get(self.url)
+        r.raise_for_status()
+
+        payload = r.json()
+        for label_event in payload:
+            try:
+                action_name, step_name, action_date = self._add_workflow_step(label_event)
+                print('processing ', action_name, step_name)
+                events.append((action_name, step_name, action_date))
+                if hanging_open:
+                      events.append(('remove', 'opened', action_date))
+                      hanging_open = False
+            except TypeError:
+                pass
+
+        if self.issue.closed_at:
+            print('events before close', events)
+            # XXX find last 'add' event
+            last_action, last_step_name, last_action_date = events[-2]
+            events.append(('add', 'closed', self.issue.closed_at))
+            events.append(('remove', last_step_name, self.issue.closed_at))
+
+        return events
 
     def _add_workflow_step(self, event):
         """Returns a tuple containing: action, step_name, date
-        """
+
+       This filters for labels scoped as 'workflow::*'
+       """
         if 'label' not in event and not event['label']['name'].startswith('workflow::'):
             return None
 
-        workflow_step = event['label']['name']
-        workflow_action = event['action']
-        workflow_date = dateparser.parse(event['created_at']).date()
-        #workflow_step_id = event['label']['id']
+        step_name = event['label']['name']
+        action_name = event['action']
+        action_date = dateparser.parse(event['created_at'])
 
-        return workflow_action, workflow_step, workflow_date
+        return action_name, step_name, action_date
 
 
 class Issue(object):
