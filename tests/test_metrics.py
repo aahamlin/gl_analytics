@@ -149,4 +149,29 @@ def test_step_before_time_window():
 
 
 def test_step_backards():
+    # dates array starts at 2021-03-15
+    events = []
+    events.append([
+        ('add', 'todo', datetime.date(2021, 3, 1)),
+        ('add', 'inprogress',dates[1]),
+        ('remove', 'todo', dates[1]),
+        ('add', 'review', dates[2]),
+        ('remove', 'inprogress',dates[2]),
+        ('add', 'inprogress',dates[3]),
+        ('remove', 'review', dates[3]),
+        ('add', 'review', dates[4]),
+        ('remove', 'inprogress',dates[4]),
+        ('add', 'done', dates[-1]),
+        ('remove', 'review', dates[-1])
+    ])
+
+    wfh = WorkflowHistory(events, series=series, dates=dates)
+    df = wfh._get_data_frame()
+    print(df.to_csv())
+
+    assert len(df["todo"].array) == 6
+    assert all([a == b for a, b in zip(df["todo"].array,       [1, 0, 0, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["inprogress"].array, [0, 1, 0, 1, 0, 0])])
+    assert all([a == b for a, b in zip(df["review"].array,     [0, 0, 1, 0, 1, 0])])
+    assert all([a == b for a, b in zip(df["done"].array,       [0, 0, 0, 0, 0, 1])])
     assert False
