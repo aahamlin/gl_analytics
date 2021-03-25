@@ -8,6 +8,7 @@ requests = "*"
 python-dotenv = "*"
 python-dateutil = "*"
 pandas = "*"
+matplotlib = "*"
 
 [dev-packages]
 pytest = "*"

@@ -79,16 +79,16 @@ def test_workflow_requires_date_object_for_start():
 
 def test_workflow_supports_datetime_for_start_date():
     expected = datetime.datetime(2021, 3, 10, 12, tzinfo=datetime.timezone.utc)
-    wfh = CumulativeFlow([], labels=TEST_SERIES, start_date=expected, days=1)
-    assert len(wfh.included_dates) == 1
-    wfh.included_dates[0] = expected
+    cf = CumulativeFlow([], labels=TEST_SERIES, start_date=expected, days=1)
+    assert len(cf.included_dates) == 1
+    cf.included_dates[0] = expected
 
 
 def test_workflow_supports_datetime_for_end_date():
     expected = datetime.datetime(2021, 3, 10, 12, tzinfo=datetime.timezone.utc)
-    wfh = CumulativeFlow([], labels=TEST_SERIES, end_date=expected, days=1)
-    assert len(wfh.included_dates) == 1
-    wfh.included_dates[0] = expected
+    cf = CumulativeFlow([], labels=TEST_SERIES, end_date=expected, days=1)
+    assert len(cf.included_dates) == 1
+    cf.included_dates[0] = expected
 
 
 def test_workflow_requires_date_object_for_end():
@@ -104,40 +104,40 @@ def test_workflow_enforces_one_day_minimum():
 
 
 def test_workflow_honors_today_with_days():
-    wfh = CumulativeFlow([], labels=TEST_SERIES, days=5)
+    cf = CumulativeFlow([], labels=TEST_SERIES, days=5)
     today = datetime.datetime.utcnow().date()
     fiveDaysAgo = start_date_for_time_window(today, 5)
-    assert len(wfh.included_dates) == 5
-    assert wfh.included_dates[0] == fiveDaysAgo
-    assert wfh.included_dates[-1] == today
+    assert len(cf.included_dates) == 5
+    assert cf.included_dates[0] == fiveDaysAgo
+    assert cf.included_dates[-1] == today
 
 
 def test_workflow_honors_end_date_default_days():
     # default 30 days
-    wfh = CumulativeFlow([], labels=TEST_SERIES, end_date=datetime.date(2021, 3, 30))
-    assert len(wfh.included_dates) == 30
-    assert wfh.included_dates[-1] == datetime.date(2021, 3, 30)
-    assert wfh.included_dates[0] == datetime.date(2021, 3, 1)
+    cf = CumulativeFlow([], labels=TEST_SERIES, end_date=datetime.date(2021, 3, 30))
+    assert len(cf.included_dates) == 30
+    assert cf.included_dates[-1] == datetime.date(2021, 3, 30)
+    assert cf.included_dates[0] == datetime.date(2021, 3, 1)
 
 
 def test_workflow_honors_start_date():
-    wfh = CumulativeFlow(
+    cf = CumulativeFlow(
         [],
         labels=TEST_SERIES,
         start_date=TEST_DATETIME_LIST[0],
         end_date=TEST_DATETIME_LIST[-1],
     )
-    assert wfh.included_dates[0] == TEST_DATETIME_LIST[0].date()
+    assert cf.included_dates[0] == TEST_DATETIME_LIST[0].date()
 
 
 def test_workflow_honors_end_date():
-    wfh = CumulativeFlow(
+    cf = CumulativeFlow(
         [],
         labels=TEST_SERIES,
         start_date=TEST_DATETIME_LIST[0],
         end_date=TEST_DATETIME_LIST[-1],
     )
-    assert wfh.included_dates[-1] == TEST_DATETIME_LIST[-1].date()
+    assert cf.included_dates[-1] == TEST_DATETIME_LIST[-1].date()
 
 
 def test_collect_values():
@@ -162,13 +162,13 @@ def test_collect_values():
         ),
     ]
 
-    wfh = CumulativeFlow(
+    cf = CumulativeFlow(
         list_of_Ts,
         labels=TEST_SERIES,
         start_date=TEST_DATETIME_LIST[0].date(),
         end_date=TEST_DATETIME_LIST[-1].date(),
     )
-    df = wfh._get_data_frame()
+    df = cf.get_data_frame()
     print(df.to_csv())
     #            todo  inprogress  review  done
     # 2021-03-15     1           0       0     0
@@ -205,13 +205,13 @@ def test_events_on_same_day_record_last_event():
         )
     ]
 
-    wfh = CumulativeFlow(
+    cf = CumulativeFlow(
         list_of_Ts,
         labels=TEST_SERIES,
         start_date=TEST_DATETIME_LIST[0].date(),
         end_date=TEST_DATETIME_LIST[-1].date(),
     )
-    df = wfh._get_data_frame()
+    df = cf.get_data_frame()
     print(df.to_csv())
 
     assert len(df["todo"].array) == 6
@@ -242,8 +242,8 @@ def test_events_in_days_from_today():
         )
     ]
 
-    wfh = CumulativeFlow(list_of_Ts, labels=TEST_SERIES, days=5)
-    df = wfh._get_data_frame()
+    cf = CumulativeFlow(list_of_Ts, labels=TEST_SERIES, days=5)
+    df = cf.get_data_frame()
     print(df.to_csv())
 
     assert len(df["todo"].array) == 5
@@ -268,13 +268,13 @@ def test_opened_before_time_window():
         )
     ]
 
-    wfh = CumulativeFlow(
+    cf = CumulativeFlow(
         list_of_Ts,
         labels=TEST_SERIES,
         start_date=TEST_DATETIME_LIST[0],
         end_date=TEST_DATETIME_LIST[-1],
     )
-    df = wfh._get_data_frame()
+    df = cf.get_data_frame()
     print(df.to_csv())
 
     assert len(df["todo"].array) == 6
@@ -299,13 +299,13 @@ def test_close_during_time_window():
         )
     ]
 
-    wfh = CumulativeFlow(
+    cf = CumulativeFlow(
         list_of_Ts,
         labels=TEST_SERIES,
         start_date=TEST_DATETIME_LIST[0],
         end_date=TEST_DATETIME_LIST[-1],
     )
-    df = wfh._get_data_frame()
+    df = cf.get_data_frame()
     print(df.to_csv())
 
     assert len(df["todo"].array) == 6
@@ -332,13 +332,13 @@ def test_step_backwards():
         )
     ]
 
-    wfh = CumulativeFlow(
+    cf = CumulativeFlow(
         list_of_Ts,
         labels=TEST_SERIES,
         start_date=TEST_DATETIME_LIST[0],
         end_date=TEST_DATETIME_LIST[-1],
     )
-    df = wfh._get_data_frame()
+    df = cf.get_data_frame()
     print(df.to_csv())
 
     assert len(df["todo"].array) == 6
@@ -364,13 +364,13 @@ def test_transitions_same_day_with_closed():
     ]
 
     series1 = ["opened"] + TEST_SERIES + ["closed"]
-    wfh = CumulativeFlow(
+    cf = CumulativeFlow(
         list_of_Ts,
         labels=series1,
         start_date=TEST_DATETIME_LIST[0],
         end_date=TEST_DATETIME_LIST[-1],
     )
-    df = wfh._get_data_frame()
+    df = cf.get_data_frame()
     print(df.to_csv())
 
     assert len(df["todo"].array) == 6
@@ -397,13 +397,13 @@ def test_created_to_closed_same_day():
 
     series1 = ["opened"] + TEST_SERIES + ["closed"]
 
-    wfh = CumulativeFlow(
+    cf = CumulativeFlow(
         list_of_Ts,
         labels=series1,
         start_date=TEST_DATETIME_LIST[0],
         end_date=TEST_DATETIME_LIST[-1],
     )
-    df = wfh._get_data_frame()
+    df = cf.get_data_frame()
     print(df.to_csv())
 
     assert len(df["todo"].array) == 6
@@ -413,3 +413,57 @@ def test_created_to_closed_same_day():
     assert all([a == b for a, b in zip(df["review"].array, [0, 0, 0, 0, 0, 0])])
     assert all([a == b for a, b in zip(df["done"].array, [0, 0, 0, 0, 0, 0])])
     assert all([a == b for a, b in zip(df["closed"].array, [0, 1, 1, 1, 1, 1])])
+
+
+def test_save_image():
+
+    list_of_Ts = [
+        Transitions(
+            TEST_CREATED_AT,
+            None,
+            workflow_transitions=[
+                ("todo", TEST_DATETIME_LIST[0]),
+                ("inprogress", TEST_DATETIME_LIST[1]),
+                ("done", TEST_DATETIME_LIST[-1]),
+            ],
+        ),
+        Transitions(
+            TEST_CREATED_AT,
+            None,
+            workflow_transitions=[
+                ("todo", TEST_DATETIME_LIST[1]),
+                ("inprogress", TEST_DATETIME_LIST[3]),
+                ("review", TEST_DATETIME_LIST[4]),
+            ],
+        ),
+    ]
+
+    cf = CumulativeFlow(
+        list_of_Ts,
+        labels=TEST_SERIES,
+        start_date=TEST_DATETIME_LIST[0],
+        end_date=TEST_DATETIME_LIST[-1],
+    )
+    df = cf.get_data_frame()
+    print(df.to_csv())
+    #            todo  inprogress  review  done
+    # 2021-03-15     1           0       0     0
+    # 2021-03-16     1           1       0     0
+    # 2021-03-17     1           1       0     0
+    # 2021-03-18     0           2       0     0
+    # 2021-03-19     0           1       1     0
+    # 2021-03-20     0           0       1     1
+    import os
+
+    if os.path.exists("output.png"):
+        os.remove("output.png")
+
+    assert not os.path.exists("output.png")
+
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+    ax = df.plot.area()
+    fig = ax.get_figure()
+    fig.savefig("output.png")
+    assert os.path.exists("output.png")

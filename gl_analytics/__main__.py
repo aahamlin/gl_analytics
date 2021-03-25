@@ -2,20 +2,11 @@
 
 """
 import os
+import sys
 from dotenv import load_dotenv
 from .issues import GitlabSession, GitlabIssuesRepository, GitlabScopedLabelResolver
 from .metrics import Transitions, CumulativeFlow
-
-#
-#  TODO:
-#    1. Take parameters to build workflow steps from scoped labels, i.e. --scope=workflow \
-#      --scope-include='Ready, In Progress, Code Review'
-#    2. Query GitLab to validate scoped labels exist (no typos) and retrieve their IDs, then use label
-#      IDs, instead of strings, when processing resource_label_events.
-#    3. Figure out how to provide scope to the GitlabWorkflowResolver class __init__ function.
-#      3a. Either, figure a way to pass arguments down the heirarchy
-#      3b. Subclass GitlabWorkflowResolver with specific scopes.
-
+from .report import CsvReport
 
 DEFAULT_SERIES = [
     "opened",
@@ -36,7 +27,7 @@ def build_transitions(issues):
     ]
 
 
-def main(access_token=None, group=None, milestone=None, days=30):
+def main(access_token=None, group=None, milestone=None, days=30, file=sys.stdout):
     session = GitlabSession(access_token=access_token)
     repository = GitlabIssuesRepository(
         session,
@@ -47,10 +38,11 @@ def main(access_token=None, group=None, milestone=None, days=30):
     issues = repository.list()
     # grab all the transitions from the elements in the list
     transitions = build_transitions(issues)
-    wfh = CumulativeFlow(transitions, days=days, labels=DEFAULT_SERIES)
-    print(wfh.to_csv())
+    cf = CumulativeFlow(transitions, labels=DEFAULT_SERIES, days=days)
+    report = CsvReport(cf.get_data_frame(), file=file)
+    report.export()
 
 
 if __name__ == "__main__":
     load_dotenv()
-    main(access_token=os.getenv("TOKEN"), group="gozynta", milestone="mb_v1.3", days=30)
+    main(access_token=os.getenv("TOKEN"), group="gozynta", milestone="mb_v1.3")

@@ -10,6 +10,18 @@ a tool to access the state events necessary to build a CFD from the ~workflow la
 - Create installable (setup.cfg or newer toml format?)
 - Add output/export class(es) for generating Images, CSV, etc
 - Refactor areas marked with XXX comments
+- generating plot images directly, rather than importing CSV into a spreadsheet
+
+Work in Progress: Using `matplotlib` to product images directly. Given a DataFrame `df`, generating a diagram and saving
+to a file is straight forward.
+
+```
+    import matplotlib.pyplot as plt
+    plt.close("all")
+    ax = df.plot.area()
+    fig = ax.get_figure()
+    fig.savefig('output.png')
+```
 
 ## Create personal access token
 

@@ -99,6 +99,15 @@ class CumulativeFlow(object):
     def labels(self):
         return self._labels
 
+    def get_data_frame(self):
+        """Build a DataFrame for processing (metrics, plotting, etc)."""
+        # index by dates within this report's time window
+        data = {k: v for k, v in zip(self._labels, self._matrix)}
+        indexes = [str(d) for d in self.included_dates]
+        df = pd.DataFrame(data, index=indexes, columns=self.labels)
+
+        return df
+
     def _calculate_include_dates(self, start, end):
         # add 1 day because generator excludes end, as matches Python generators expectations
         end = end + datetime.timedelta(1)
@@ -107,19 +116,6 @@ class CumulativeFlow(object):
     def _data_range_from_days(self, end, days):
         start = start_date_for_time_window(end, days)
         return (start, end)
-
-    def to_csv(self, *args, **kwargs):
-        df = self._get_data_frame()
-        return df.to_csv(*args, **kwargs)
-
-    def _get_data_frame(self):
-        """Build a DataFrame for processing (metrics, plotting, etc)."""
-        # index by dates within this report's time window
-        data = {k: v for k, v in zip(self._labels, self._matrix)}
-        indexes = [str(d) for d in self.included_dates]
-        df = pd.DataFrame(data, index=indexes, columns=self.labels)
-
-        return df
 
     def _build_matrix(self):
         # process self._transitions, e.g. a list of lists containing transitions of each issue
