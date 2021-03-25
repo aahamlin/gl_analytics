@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 
 from random import randrange
-from gl_analytics.metrics import daterange, WorkflowHistory
+from gl_analytics.metrics import daterange, date_days_prior, WorkflowHistory
 
 dates = [d for d in daterange(datetime.date(2021, 3, 15), datetime.date(2021, 3, 21))]
 
@@ -15,6 +15,11 @@ def test_daterange_exclusive():
     d2 = datetime.date(2021, 3, 5)
     dates = [d for d in daterange(d1, d2)]
     assert dates[-1] == datetime.date(2021, 3, 4)
+
+def test_date_days_prior():
+    d1 = datetime.date(2021, 3, 15)
+    d2 = date_days_prior(d1, 5)
+    assert d2 == datetime.date(2021, 3, 10)
 
 
 def test_collect_values():
@@ -34,7 +39,7 @@ def test_collect_values():
         ('remove', 'inprogress',dates[4])
     ])
 
-    wfh = WorkflowHistory(events, series=series, daterange=dates)
+    wfh = WorkflowHistory(events, series=series, dates=dates)
     df = wfh._get_data_frame()
     print(df.to_csv())
     #            todo  inprogress  review  done
@@ -69,7 +74,7 @@ def test_events_on_same_day_record_last_event():
         ('remove', 'inprogress',dates[1])
     ])
 
-    wfh = WorkflowHistory(events, series=series, daterange=dates)
+    wfh = WorkflowHistory(events, series=series, dates=dates)
     df = wfh._get_data_frame()
     print(df.to_csv())
 
@@ -78,3 +83,30 @@ def test_events_on_same_day_record_last_event():
     assert all([a == b for a, b in zip(df["inprogress"].array, [0, 0, 0, 0, 0, 0])])
     assert all([a == b for a, b in zip(df["review"].array, [0, 1, 1, 1, 1, 1])])
     assert all([a == b for a, b in zip(df["done"].array, [0, 0, 0, 0, 0, 0])])
+
+def test_events_in_days_window():
+    end = datetime.datetime.utcnow().date()
+    start = date_days_prior(end, 5)
+    print(f'from {start} to {end}')
+
+    recent = [d for d in daterange(start, end)]
+
+    events = []
+    events.append([
+        ('add', 'todo', recent[1]),
+        ('add', 'inprogress', recent[1]),
+        ('remove', 'todo', recent[1]),
+        ('add', 'review', recent[1]),
+        ('remove', 'inprogress', recent[1])
+    ])
+
+    wfh = WorkflowHistory(events, series=series, days=5)
+    df = wfh._get_data_frame()
+    print(df.to_csv())
+
+    assert len(df["todo"].array) == 5
+    assert all([a == b for a, b in zip(df["todo"].array, [0, 0, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["inprogress"].array, [0, 0, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["review"].array, [0, 1, 1, 1, 1])])
+    assert all([a == b for a, b in zip(df["done"].array, [0, 0, 0, 0, 0])])
+

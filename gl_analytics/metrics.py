@@ -6,17 +6,21 @@ def daterange(start_date, end_date):
     for n in range(int((end_date - start_date).days)):
         yield start_date + datetime.timedelta(n)
 
+def date_days_prior(date, days):
+    return (date-datetime.timedelta(days))
+
+
 DEFAULT_SERIES = ['open', 'workflow::Ready', 'workflow::In Progress', 'workflow::Code Review', 'closed']
 
 class WorkflowHistory(object):
 
-    def __init__(self, events, series=DEFAULT_SERIES, days=30, daterange=None):
+    def __init__(self, events, series=DEFAULT_SERIES, days=30, dates=None):
 
-        now = datetime.datetime.utcnow()
-        if not daterange:
-            self._daterange = daterange(now-datetime.timedelta(days), now)
+        if not dates:
+            today = datetime.datetime.utcnow().date()
+            self._daterange = list(daterange(date_days_prior(today, days), today))
         else:
-            self._daterange = daterange
+            self._daterange = dates
         self._series = series
         self._events = events
 
@@ -36,7 +40,7 @@ class WorkflowHistory(object):
             range_of_labels = {}
             for action, label, date in ev:
                 if action == 'add':
-                    range_of_labels[label] = (date,datetime.date.max)
+                    range_of_labels[label] = (date, datetime.date.max)
                 if action == 'remove':
                     added, _ = range_of_labels[label]
                     range_of_labels[label] = (added, date)
@@ -48,7 +52,7 @@ class WorkflowHistory(object):
                 start, end = labelrange
                 # loop through dates until end of time window.
                 # avoid looping to datetime.date.max =)
-                for d1 in [d0 for d0 in daterange(start, end) if d0 <= self._daterange[-1]]:
+                for d1 in [d for d in daterange(start, end) if d <= self._daterange[-1]]:
                     # find date index and increment
                     date_index = self._daterange.index(d1)
                     series_buckets[series_index][date_index] += 1
