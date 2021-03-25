@@ -1,6 +1,6 @@
 """ Issues module interacts with a backend system API, e.g. GitLab.
 """
-
+import sys
 import json
 import requests
 
@@ -48,7 +48,7 @@ class GitlabIssuesRepository(AbstractRepository):
 
     If ever we needed it, an AbstractRepository could be extracted.
     """
-
+    # XXX Create a Workflow Resolver to fetch workflow states for each issue. Replaces the Gitlabissueworkflowrepository.
     def __init__(self, session, group=None, milestone=None):
         """Initialize a repository.
        """
@@ -72,8 +72,8 @@ class GitlabIssuesRepository(AbstractRepository):
     def _build_request_url(self):
         url = "{0}/groups/{1}/issues".format(GITLAB_URL_BASE, self._group)
         params = { 'pagination': 'keyset', 'milestone': self._milestone }
-        print('built url:', url)
-        print('built params:', params)
+        print('built url:', url, file=sys.stderr)
+        print('built params:', params, file=sys.stderr)
         return "{0}?{1}".format(url, urlencode(params))
 
 
@@ -101,7 +101,7 @@ class GitlabIssuesRepository(AbstractRepository):
                 # setup next page request
                 next_link = r1.links['next']
                 url = next_link['url']
-                print('next page:', url)
+                print('next page:', url, file=sys.stderr)
             else:
                 hasMore = False
 
@@ -157,7 +157,7 @@ class GitlabIssueWorkflowRepository(AbstractRepository):
         payload = r.json()
         for label_event in payload:
             try:
-                action_name, step_name, action_date = self._add_workflow_step(label_event)
+                action_name, step_name, action_date = self._get_workflow_step(label_event)
                 #print('processing ', action_name, step_name)
                 events.append((action_name, step_name, action_date))
                 if hanging_open:
@@ -180,13 +180,15 @@ class GitlabIssueWorkflowRepository(AbstractRepository):
 
         return events
 
-    def _add_workflow_step(self, event):
+    def _get_workflow_step(self, event):
         """Returns a tuple containing: action, step_name, date
 
        This filters for labels scoped as 'workflow::*'
        """
-        # XXX This startswith workflow:: will come back to bite me someday, I know
-        if 'label' not in event and not event['label']['name'].startswith('workflow::'):
+        if 'label' not in event:
+            return None
+
+        if not event['label']['name'].startswith('workflow:'):
             return None
 
         step_name = event['label']['name']
