@@ -9,7 +9,6 @@ from urllib.parse import urlencode
 
 GITLAB_URL_BASE = "https://gitlab.com/api/v4"
 
-
 class IssuesError(Exception):
     pass
 
@@ -239,8 +238,7 @@ class Issue(object):
         return f"Issue(id:{self.issue_id}, p:{self.project_id}, o:{self.opened_at}, c:{self.closed_at}, w:{self.workflow})"
 
 
-
-def get_issues(session, group=None, milestone=None):
+def find_issues(session, group=None, milestone=None):
     """Returns all issues by group and milestone and their entire workflow history.
 
     session: *required* Session object

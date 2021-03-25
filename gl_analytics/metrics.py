@@ -9,6 +9,14 @@ def daterange(start_date, end_date):
 def date_days_prior(date, days):
     return (date-datetime.timedelta(days))
 
+def _resolve_date(date_or_datetime):
+    if isinstance(date_or_datetime, datetime.datetime):
+        return date_or_datetime.date()
+    elif isinstance(date_or_datetime, datetime.date):
+        return date_or_datetime
+
+    raise ValueError(datetime.datetime)
+
 
 DEFAULT_SERIES = ['open', 'workflow::Ready', 'workflow::In Progress', 'workflow::Code Review', 'closed']
 
@@ -38,7 +46,8 @@ class WorkflowHistory(object):
         for ev in self._events:
             # store each label in series key, build start and end range by 'add' and 'remove'
             range_of_labels = {}
-            for action, label, date in ev:
+            for action, label, dt in ev:
+                date = _resolve_date(dt)
                 if action == 'add':
                     range_of_labels[label] = (date, datetime.date.max)
                 if action == 'remove':
@@ -50,10 +59,9 @@ class WorkflowHistory(object):
                 series_index = self._series.index(label)
                 # build daterange from label range
                 start, end = labelrange
-                # loop through dates until end of time window.
-                # avoid looping to datetime.date.max =)
-                for d1 in [d for d in daterange(start, end) if d <= self._daterange[-1]]:
-                    # find date index and increment
+                #print(f'range for label {label}: {start} - {end}')
+                # loop through dates included in the time window.
+                for d1 in [d for d in daterange(start, end) if d in self._daterange]:
                     date_index = self._daterange.index(d1)
                     series_buckets[series_index][date_index] += 1
 

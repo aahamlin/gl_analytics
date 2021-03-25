@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 
 from random import randrange
-from gl_analytics.metrics import daterange, date_days_prior, WorkflowHistory
+from gl_analytics.metrics import daterange, date_days_prior, _resolve_date, WorkflowHistory
 
 dates = [d for d in daterange(datetime.date(2021, 3, 15), datetime.date(2021, 3, 21))]
 
@@ -20,6 +20,20 @@ def test_date_days_prior():
     d1 = datetime.date(2021, 3, 15)
     d2 = date_days_prior(d1, 5)
     assert d2 == datetime.date(2021, 3, 10)
+
+def test_resolve_date_from_date():
+    expected = datetime.date(2021, 3, 20)
+    assert _resolve_date(expected) == expected
+
+def test_resolve_date_from_datetime():
+    expected = datetime.datetime(2021, 3, 20, 0, 0, 0, tzinfo=datetime.timezone.utc)
+    assert _resolve_date(expected) == expected.date()
+
+
+def test_resolve_date_from_other():
+    with pytest.raises(ValueError):
+        _resolve_date('foo')
+
 
 
 def test_collect_values():
@@ -110,3 +124,29 @@ def test_events_in_days_window():
     assert all([a == b for a, b in zip(df["review"].array, [0, 1, 1, 1, 1])])
     assert all([a == b for a, b in zip(df["done"].array, [0, 0, 0, 0, 0])])
 
+def test_step_before_time_window():
+    # dates array starts at 2021-03-15
+    events = []
+    events.append([
+        ('add', 'todo', datetime.date(2021, 3, 1)),
+        ('add', 'inprogress',dates[1]),
+        ('remove', 'todo', dates[1]),
+        ('add', 'review', dates[3]),
+        ('remove', 'inprogress',dates[3]),
+        ('add', 'done', dates[-1]),
+        ('remove', 'review', dates[-1])
+    ])
+
+    wfh = WorkflowHistory(events, series=series, dates=dates)
+    df = wfh._get_data_frame()
+    print(df.to_csv())
+
+    assert len(df["todo"].array) == 6
+    assert all([a == b for a, b in zip(df["todo"].array, [1, 0, 0, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["inprogress"].array, [0, 1, 1, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["review"].array, [0, 0, 0, 1, 1, 0])])
+    assert all([a == b for a, b in zip(df["done"].array, [0, 0, 0, 0, 0, 1])])
+
+
+def test_step_backards():
+    assert False
