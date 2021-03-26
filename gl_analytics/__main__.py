@@ -1,19 +1,15 @@
 
 import os
 from dotenv import load_dotenv
-from itertools import chain
 from .issues import GitlabSession, GitlabIssuesRepository, GitlabWorkflowResolver
 from .metrics import WorkflowHistory
-
 
 def main(repository=None):
     if not repository:
         raise TypeError()
 
     issues = repository.list()
-    events = [e for e in chain([i.workflow for i in issues])]
-
-    wfh = WorkflowHistory(events, days=60)
+    wfh = WorkflowHistory(issues, days=60)
     print(wfh.to_csv())
 
 if __name__ == "__main__":

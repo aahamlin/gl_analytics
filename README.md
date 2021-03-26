@@ -5,6 +5,9 @@ The GitLab product has an open [issue](https://gitlab.com/gitlab-org/gitlab/-/is
 Using the GitLab [resource state events](https://docs.gitlab.com/ee/api/resource_state_events.html) API we should be able to build
 a tool to access the state events necessary to build a CFD from the ~workflow labels used on our Kanban board.
 
+## Todos
+
+- Code Review is not automated so transition to closed should account for that in time overlaps
 
 ## Create personal access token
 

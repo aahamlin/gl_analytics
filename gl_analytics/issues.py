@@ -127,8 +127,13 @@ class GitlabWorkflowResolver(object):
     Workflow events are an array of tuples. But should probably be changed to an object.
     """
 
-    def __init__(self, session):
+    def __init__(self, session, scope='workflow'):
+        """Initialize the resolve with your GitlabSession object.
+
+        Optionally, provide the scoped label, the start of a scoped label up to the double-colon (::).
+       """
         self._session = session
+        self._scope = scope + '::'
 
     def resolve(self, item):
         url = self._build_request_url(item['project_id'], item['iid'])
@@ -150,46 +155,53 @@ class GitlabWorkflowResolver(object):
         return payload
 
     def _calculate_workflow(self, item, payload):
+        """Process transitions through workflow steps.
+
+        Produces a standard record of events so that the `metrics` module can easily
+        process them.
+
+        opened => step1 => step2 => ... => closed
+
+        List of tuples containing "step" and "datetime", e.g. ('opened', 2021-02-09T16:59:37.783Z')
+
+        The data structure will contain enough information to build transitions. Transitions are
+        different than GitLab's adding and removing of Labels on a date. Therefore, we will use the
+        created_at date to signify the transition point of time.
+
+        Assumes:
+        - GitLab orders events by date (oldest first)
+
+       """
         # every workflow starts with 'opened'
         events = []
-        events.append(('add', 'opened', date_parser.parse(item['created_at'])))
-        hanging_open = True
+        events.append(('opened', date_parser.parse(item['created_at'])))
 
         for label_event in payload:
             try:
                 action_name, step_name, action_date = self._get_workflow_step(label_event)
-                #print('processing ', action_name, step_name)
-                events.append((action_name, step_name, action_date))
-                if hanging_open:
-                      events.append(('remove', 'opened', action_date))
-                      hanging_open = False
+                if action_name == 'add':
+                    events.append((step_name, action_date))
             except TypeError:
+                # non-qualifying label event returned None
                 pass
 
         # closed issues will end with 'closed'
         if 'closed_at' in item:
             #print('events before close', events)
             closed_at = date_parser.parse(item['closed_at'])
-            try:
-                # XXX ugly syntax
-                prev_add = next(filter(lambda a: a[0] == 'add', reversed(events)))
-                events.append(('add', 'closed', closed_at))
-                _, last_name, _ = prev_add
-                events.append(('remove', last_name, closed_at))
-            except StopIteration:
-                events.append(('add', 'closed', closed_at))
+            events.append(('closed', closed_at))
 
         return events
 
     def _get_workflow_step(self, event):
         """Returns a tuple containing: action, step_name, date
 
-       This filters for labels scoped as 'workflow::*'
+        Return None for non-qualifying label events.
        """
         if 'label' not in event:
             return None
 
-        if not event['label']['name'].startswith('workflow:'):
+        if not event['label']['name'].startswith(self._scope):
             return None
 
         step_name = event['label']['name']

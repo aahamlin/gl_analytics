@@ -96,9 +96,10 @@ def test_issue_workflow_resolver():
 
     assert len(issue_list) == 1
     wf = issue_list[0].workflow
-    assert len(wf) == 5
+    assert wf != None
+    assert len(wf) > 0
 
-def test_repo_list_opened():
+def test_repo_list_starts_with_opened():
 
     fake = FakeRequestFactory()
     fake.responses.append(build_http_response(
@@ -115,10 +116,9 @@ def test_repo_list_opened():
     wf = workflow['_workflow']
 
     assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/3/resource_label_events"
-    assert wf[0] == ('add', 'opened', date_parser.parse("2021-02-08T16:59:37.783Z"))
-    assert wf[2] == ('remove', 'opened', date_parser.parse("2021-02-09T16:59:37.783Z"))
+    assert wf[0] == ('opened', date_parser.parse("2021-02-08T16:59:37.783Z"))
 
-def test_repo_list_workflow():
+def test_repo_list_workflow_transitions():
 
     fake = FakeRequestFactory()
     fake.responses.append(build_http_response(
@@ -135,10 +135,19 @@ def test_repo_list_workflow():
     wf = workflow['_workflow']
     assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/3/resource_label_events"
     # steps:  +opened, +desiging, -opened, +inprogress, -designing
-    assert len(wf) == 5
-    assert all([isinstance(d, datetime.datetime) for _, _, d in wf])
+    assert len(wf) == 3
+    cols = [list(t) for t in zip(*wf)]
+    # checks steps
+    assert all([a==b for a, b in zip(cols[0], ['opened', 'workflow::Designing', 'workflow::In Progress'])])
+    # checks dates
+    assert all([a==b for a, b in zip(cols[1], [
+        date_parser.parse('2021-02-09T16:59:37.783Z'),
+        date_parser.parse('2021-02-09T16:59:37.783Z'),
+        date_parser.parse('2021-02-09T17:00:49.416Z')
+    ])])
 
-def test_repo_list_closed():
+
+def test_repo_list_ends_with_closed():
 
     fake = FakeRequestFactory()
     fake.responses.append(build_http_response(
@@ -156,7 +165,4 @@ def test_repo_list_closed():
     wf = workflow['_workflow']
 
     assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/3/resource_label_events"
-
-    closed_at = date_parser.parse("2021-02-15T00:00:00.000Z")
-    assert wf[-2] == ('add', 'closed', closed_at)
-    assert wf[-1] == ('remove', 'workflow::In Progress', closed_at)
+    assert wf[-1] == ('closed', date_parser.parse("2021-02-15T00:00:00.000Z"))

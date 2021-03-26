@@ -3,8 +3,24 @@ import datetime
 import pandas as pd
 
 from random import randrange
+
+from gl_analytics.issues import Issue
 from gl_analytics.metrics import daterange, start_date_for_time_window, _resolve_date, WorkflowHistory
 
+class FakeIssueWorkflow(obejct):
+
+    def __init__(self, wf):
+        self._workflow = wf
+
+    @property
+    def workflow(self):
+        return self._workflow
+
+def build_test_workflows(Itransitions, **kwargs):
+    issue_workflows = list(map(FakeIssueWorkflow, transitions))
+    return issue_workflows
+
+# dates of transitions in test, unless otherwise provided
 dates = [d for d in daterange(datetime.date(2021, 3, 15), datetime.date(2021, 3, 21))]
 
 # series of workflow steps
@@ -65,23 +81,19 @@ def test_workflow_honors_start_date():
     assert wfh.included_dates[-1] == dates[-1]
 
 def test_collect_values():
-    events = []
-    events.append([
-        ('add', 'todo', dates[0]),
-        ('add', 'inprogress',dates[1]),
-        ('remove', 'todo', dates[1]),
-        ('add', 'done', dates[-1]),
-        ('remove', 'inprogress',dates[-1])
-    ])
-    events.append([
-        ('add', 'todo', dates[1]),
-        ('add', 'inprogress',dates[3]),
-        ('remove', 'todo', dates[3]),
-        ('add', 'review', dates[4]),
-        ('remove', 'inprogress',dates[4])
-    ])
+    workflows = build_test_workflows(
+        [
+            ('todo', dates[0]),
+            ('inprogress',dates[1]),
+            ('done', dates[-1])
+        ], [
+            ('todo', dates[1]),
+            ('inprogress',dates[3]),
+            ('review', dates[4])
+        ]
+    )
 
-    wfh = WorkflowHistory(events, series=series, start_date=dates[0], end_date=dates[-1])
+    wfh = WorkflowHistory(workflows, series=series, start_date=dates[0], end_date=dates[-1])
     df = wfh._get_data_frame()
     print(df.to_csv())
     #            todo  inprogress  review  done
@@ -107,16 +119,15 @@ def test_collect_values():
 def test_events_on_same_day_record_last_event():
     """Test that 2 events added on same day == last occuring event of the day.
     """
-    events = []
-    events.append([
-        ('add', 'todo', dates[1]),
-        ('add', 'inprogress',dates[1]),
-        ('remove', 'todo', dates[1]),
-        ('add', 'review', dates[1]),
-        ('remove', 'inprogress',dates[1])
-    ])
+    workflows = build_test_workflows(
+        [
+            ('todo', dates[1]),
+            ('inprogress',dates[1]),
+            ('review', dates[1])
+        ]
+    )
 
-    wfh = WorkflowHistory(events, series=series, start_date=dates[0], end_date=dates[-1])
+    wfh = WorkflowHistory(workflows, series=series, start_date=dates[0], end_date=dates[-1])
     df = wfh._get_data_frame()
     print(df.to_csv())
 
@@ -136,16 +147,15 @@ def test_events_in_days_from_today():
 
     recent = [d for d in daterange(start, (end + datetime.timedelta(1)))]
 
-    events = []
-    events.append([
-        ('add', 'todo', recent[1]),
-        ('add', 'inprogress', recent[1]),
-        ('remove', 'todo', recent[1]),
-        ('add', 'review', recent[1]),
-        ('remove', 'inprogress', recent[1])
-    ])
+    workflows = build_test_workflows(
+        [
+            ('todo', dates[1]),
+            ('inprogress',dates[1]),
+            ('review', dates[1])
+        ]
+    )
 
-    wfh = WorkflowHistory(events, series=series, days=5)
+    wfh = WorkflowHistory(workflows, series=series, days=5)
     df = wfh._get_data_frame()
     print(df.to_csv())
 
@@ -157,18 +167,16 @@ def test_events_in_days_from_today():
 
 def test_step_before_time_window():
     # dates array starts at 2021-03-15
-    events = []
-    events.append([
-        ('add', 'todo', datetime.date(2021, 3, 1)),
-        ('add', 'inprogress',dates[1]),
-        ('remove', 'todo', dates[1]),
-        ('add', 'review', dates[3]),
-        ('remove', 'inprogress',dates[3]),
-        ('add', 'done', dates[-1]),
-        ('remove', 'review', dates[-1])
-    ])
+    workflows = build_test_workflows(
+        [
+            ('todo', datetime.date(2021, 3, 1)),
+            ('inprogress',dates[1]),
+            ('review', dates[3]),
+            ('done', dates[-1])
+        ]
+    )
 
-    wfh = WorkflowHistory(events, series=series, start_date=dates[0], end_date=dates[-1])
+    wfh = WorkflowHistory(workflows, series=series, start_date=dates[0], end_date=dates[-1])
     df = wfh._get_data_frame()
     print(df.to_csv())
 
@@ -181,22 +189,18 @@ def test_step_before_time_window():
 
 def test_step_backwards():
     # dates array starts at 2021-03-15
-    events = []
-    events.append([
-        ('add', 'todo', datetime.date(2021, 3, 1)),
-        ('add', 'inprogress',dates[1]),
-        ('remove', 'todo', dates[1]),
-        ('add', 'review', dates[2]),
-        ('remove', 'inprogress',dates[2]),
-        ('add', 'inprogress',dates[3]),
-        ('remove', 'review', dates[3]),
-        ('add', 'review', dates[4]),
-        ('remove', 'inprogress',dates[4]),
-        ('add', 'done', dates[-1]),
-        ('remove', 'review', dates[-1])
-    ])
+    workflows = build_test_workflows(
+        [
+            ('todo', datetime.date(2021, 3, 1)),
+            ('inprogress',dates[1]),
+            ('review', dates[2]),
+            ('inprogress',dates[3]),
+            ('review', dates[4]),
+            ('done', dates[-1])
+        ]
+    )
 
-    wfh = WorkflowHistory(events, series=series,  start_date=dates[0], end_date=dates[-1])
+    wfh = WorkflowHistory(workflows, series=series,  start_date=dates[0], end_date=dates[-1])
     df = wfh._get_data_frame()
     print(df.to_csv())
 
@@ -210,17 +214,15 @@ def test_step_backwards():
 
 def test_added_removed_same_day():
 
-    events = []
-    events.append([
-        ('add', 'todo', dates[1]),
-        ('add', 'inprogress',dates[1]),
-        ('remove', 'todo', dates[1]),
-        ('add', 'review', dates[1]),
-        ('remove', 'inprogress',dates[1]),
-        ('remove', 'review', dates[1])
-    ])
+    workflows = build_test_workflows(
+        [
+            ('todo', dates[1]),
+            ('inprogress',dates[1]),
+            ('review', dates[1])
+        ]
+    )
 
-    wfh = WorkflowHistory(events, series=series, start_date=dates[0], end_date=dates[-1])
+    wfh = WorkflowHistory(workflows, series=series, start_date=dates[0], end_date=dates[-1])
     df = wfh._get_data_frame()
     print(df.to_csv())
 
