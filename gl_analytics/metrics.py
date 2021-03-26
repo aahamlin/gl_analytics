@@ -120,4 +120,6 @@ class WorkflowHistory(object):
         return df
 
     def _labels_time_window(self, start, end):
-         return [d for d in daterange(start, end) if d in self.included_dates]
+        inside_start = start if start > self.included_dates[0] else self.included_dates[0]
+        inside_end = end if end <= self.included_dates[-1] else (self.included_dates[-1]+datetime.timedelta(1))
+        return list(daterange(inside_start, inside_end))
