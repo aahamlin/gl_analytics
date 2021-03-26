@@ -179,7 +179,7 @@ def test_step_before_time_window():
     assert all([a == b for a, b in zip(df["done"].array, [0, 0, 0, 0, 0, 1])])
 
 
-def skip_test_step_backwards():
+def test_step_backwards():
     # dates array starts at 2021-03-15
     events = []
     events.append([
@@ -207,3 +207,25 @@ def skip_test_step_backwards():
     assert all([a == b for a, b in zip(df["inprogress"].array, [0, 1, 0, 1, 0, 0])])
     assert all([a == b for a, b in zip(df["review"].array,     [0, 0, 1, 0, 1, 0])])
     assert all([a == b for a, b in zip(df["done"].array,       [0, 0, 0, 0, 0, 1])])
+
+def test_added_removed_same_day():
+
+    events = []
+    events.append([
+        ('add', 'todo', dates[1]),
+        ('add', 'inprogress',dates[1]),
+        ('remove', 'todo', dates[1]),
+        ('add', 'review', dates[1]),
+        ('remove', 'inprogress',dates[1]),
+        ('remove', 'review', dates[1])
+    ])
+
+    wfh = WorkflowHistory(events, series=series, start_date=dates[0], end_date=dates[-1])
+    df = wfh._get_data_frame()
+    print(df.to_csv())
+
+    assert len(df["todo"].array) == 6
+    assert all([a == b for a, b in zip(df["todo"].array, [0, 0, 0, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["inprogress"].array, [0, 0, 0, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["review"].array, [0, 1, 0, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["done"].array, [0, 0, 0, 0, 0, 0])])
