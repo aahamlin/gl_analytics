@@ -49,15 +49,25 @@ class GitlabIssuesRepository(AbstractRepository):
     If ever we needed it, an AbstractRepository could be extracted.
     """
     # XXX Create a Workflow Resolver to fetch workflow states for each issue. Replaces the Gitlabissueworkflowrepository.
-    def __init__(self, session, group=None, milestone=None):
+    def __init__(self, session, group=None, milestone=None, resolvers=[]):
         """Initialize a repository.
-       """
+
+        Required:
+        session: session object
+        group: group name or id
+        milestone: milestone name or id
+
+        Optional:
+        resolvers: resolve additional fields
+        """
         if not group or not milestone:
             raise SyntaxError('Requires group and milestone')
 
         self._session = session
         self._group = group
         self._milestone = milestone
+        self._resolvers = resolvers
+
         self._url = self._build_request_url()
 
     @property
@@ -75,7 +85,6 @@ class GitlabIssuesRepository(AbstractRepository):
         print('built url:', url, file=sys.stderr)
         print('built params:', params, file=sys.stderr)
         return "{0}?{1}".format(url, urlencode(params))
-
 
     def _page_results(self):
         """Generator of issues from pages of results.
@@ -95,6 +104,7 @@ class GitlabIssuesRepository(AbstractRepository):
             #count = len(payload)
             #print(f'processing {count} items');
             for item in payload:
+                item = self._resolve_fields(item)
                 yield Issue(item)
 
             if r1.links and 'next' in r1.links:
@@ -105,35 +115,26 @@ class GitlabIssuesRepository(AbstractRepository):
             else:
                 hasMore = False
 
-class GitlabIssueWorkflowRepository(AbstractRepository):
-    """List workflow events for an issue.
+    def _resolve_fields(self, item):
+        for resolver_cls in self._resolvers:
+            resolver = resolver_cls(self._session)
+            item.update(resolver.resolve(item))
+        return item
+
+class GitlabWorkflowResolver(object):
+    """Add workflow events to an item
 
     Workflow events are an array of tuples. But should probably be changed to an object.
     """
-    def __init__(self, session, issue=None):
 
-        if not issue:
-            raise SyntaxError('Requires issue')
-
+    def __init__(self, session):
         self._session = session
-        self._issue = issue
-        self._url = self._build_request_url(issue.project_id, issue.issue_id)
 
-    @property
-    def issue(self):
-        return self._issue
+    def resolve(self, item):
+        url = self._build_request_url(item['project_id'], item['iid'])
+        res = self._fetch_results(url)
+        return {'_workflow': self._calculate_workflow(item, res)}
 
-    @property
-    def url(self):
-        return self._url
-
-    def list(self):
-        """Return workflow events list for the issue.
-
-       Events array items are tuples: 'action', 'worflowStep', 'date'
-       """
-        # XXX this is inconsistent with Issue class.
-        return [x for x in self._fetch_results()]
 
     def _build_request_url(self, project_id, issue_id):
         # /api/v4/projects/8279995/issues/191/resource_label_events
@@ -141,20 +142,19 @@ class GitlabIssueWorkflowRepository(AbstractRepository):
             GITLAB_URL_BASE, project_id, issue_id)
         return url
 
-    def _fetch_results(self):
-        """Collect steps of the workflow for this issue.
-        """
-        # XXX how to manage the datetime values? truncate to a date or keep time as well?
-
-        # every workflow starts with 'opened'
-        events = []
-        events.append(('add', 'opened', self.issue.opened_at))
-        hanging_open = True
-
-        r = self._session.get(self.url)
+    def _fetch_results(self, url):
+        r = self._session.get(url)
         r.raise_for_status()
 
         payload = r.json()
+        return payload
+
+    def _calculate_workflow(self, item, payload):
+        # every workflow starts with 'opened'
+        events = []
+        events.append(('add', 'opened', date_parser.parse(item['created_at'])))
+        hanging_open = True
+
         for label_event in payload:
             try:
                 action_name, step_name, action_date = self._get_workflow_step(label_event)
@@ -167,16 +167,17 @@ class GitlabIssueWorkflowRepository(AbstractRepository):
                 pass
 
         # closed issues will end with 'closed'
-        if self.issue.closed_at:
+        if 'closed_at' in item:
             #print('events before close', events)
-            # XXX find last 'add' event
+            closed_at = date_parser.parse(item['closed_at'])
             try:
+                # XXX ugly syntax
                 prev_add = next(filter(lambda a: a[0] == 'add', reversed(events)))
-                events.append(('add', 'closed', self.issue.closed_at))
+                events.append(('add', 'closed', closed_at))
                 _, last_name, _ = prev_add
-                events.append(('remove', last_name, self.issue.closed_at))
+                events.append(('remove', last_name, closed_at))
             except StopIteration:
-                events.append(('add', 'closed', self.issue.closed_at))
+                events.append(('add', 'closed', closed_at))
 
         return events
 
@@ -200,13 +201,16 @@ class GitlabIssueWorkflowRepository(AbstractRepository):
 
 class Issue(object):
 
-    def __init__(self, item, workflow=[]):
+    def __init__(self, item):
         #print('creating Issue from item', json.dumps(item))
         self._issue_id = item['iid']
         self._project_id = item['project_id']
         self._opened_at = date_parser.parse(item['created_at'])
         closed_at = item.get('closed_at')
         self._closed_at = date_parser.parse(closed_at) if closed_at else None
+
+        if '_workflow' in item:
+            self._workflow = item['_workflow']
 
     @property
     def issue_id(self):
@@ -245,10 +249,6 @@ def find_issues(session, group=None, milestone=None):
 
     session: *required* Session object
     """
-    repo = GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3")
+    repo = GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3", resolvers=[GitlabWorkflowResolver])
     issues = repo.list()
-    for issue in issues:
-        labels = GitlabIssueWorkflowRepository(session, issue)
-        issue.workflow = labels.list()
-
     return issues
