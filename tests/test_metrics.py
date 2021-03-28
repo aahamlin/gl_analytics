@@ -5,8 +5,7 @@ import pandas as pd
 from random import randrange
 
 # XXX date handling needs to be cleaned up
-from gl_analytics.metrics import daterange, start_date_for_time_window, _resolve_date, \
-    CumulativeFlow, Transitions
+from gl_analytics.metrics import daterange, start_date_for_time_window, CumulativeFlow, Transitions
 
 # dates of transitions in test, unless otherwise provided
 created_at = datetime.datetime(2021, 3, 10)
@@ -34,18 +33,6 @@ def test_start_date_window_value_error():
     with pytest.raises(ValueError):
         start_date_for_time_window(datetime.date(2021, 3, 30), 0)
     assert start_date_for_time_window(datetime.date(2021, 3, 30), 1) == datetime.date(2021, 3, 30)
-
-def test_resolve_date_from_date():
-    expected = datetime.date(2021, 3, 20)
-    assert _resolve_date(expected) == expected
-
-def test_resolve_date_from_datetime():
-    expected = datetime.datetime(2021, 3, 20, 0, 0, 0, tzinfo=datetime.timezone.utc)
-    assert _resolve_date(expected) == expected.date()
-
-def test_resolve_date_from_other():
-    with pytest.raises(ValueError):
-        _resolve_date('foo')
 
 def test_transitions_is_sequence():
 

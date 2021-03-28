@@ -22,15 +22,6 @@ def start_date_for_time_window(end_date, days):
 
     return (end_date-datetime.timedelta(days-1))
 
-def _resolve_date(date_or_datetime):
-    if not isinstance(date_or_datetime, datetime.date):
-        raise ValueError()
-
-    if hasattr(date_or_datetime, 'date'):
-        return date_or_datetime.date()
-    else:
-        return date_or_datetime
-
 def transition_to_date(label, datetime):
     return label, datetime.date()
 
@@ -41,12 +32,7 @@ class Transitions(Sequence):
         transitions = [('opened', opened)] + workflow_transitions
         if closed:
             transitions += [('closed', closed)]
-
-        print(f'transitions {transitions}')
         self._transitions = transitions
-
-    def by_date(self):
-        return list(starmap(transition_to_date, self._transitions))
 
     def __getitem__(self, key):
         return self._transitions.__getitem__(key)
@@ -60,7 +46,6 @@ DEFAULT_SERIES = ['opened', 'workflow::Ready', 'workflow::In Progress', 'workflo
 class MetricsError(Exception):
     pass
 
-# XXX Rename CumulativeFlow
 class CumulativeFlow(object):
     def __init__(self, transitions, series=DEFAULT_SERIES, days=30, end_date=None, start_date=None):
 
@@ -86,7 +71,8 @@ class CumulativeFlow(object):
             self._included_dates = self._calculate_include_dates(*self._data_range_from_days(end_date, days))
 
         self._series = series
-        self._transitions = transitions
+        # Cumulativeflow only records changes per day, so normalize all transition to dates
+        self._transitions = list([starmap(transition_to_date, t) for t in transitions])
         self._matrix = self._build_matrix()
 
     @property
@@ -131,9 +117,9 @@ class CumulativeFlow(object):
 
         matrix = [[0 for _ in self.included_dates] for _ in self._series]
 
-        for wf_transition in self._transitions:
+        for wf_transitions in self._transitions:
             # filter issue to labels in our series and squash datetimes to date only values
-            transitions = [(s, t) for s, t in wf_transition.by_date() if s in self._series]
+            transitions = [(s, t) for s, t in wf_transitions if s in self._series]
             print(f'filtered transitions {transitions}')
 
             labels, dates = list(zip(*transitions))
