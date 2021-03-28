@@ -34,12 +34,6 @@ def _resolve_date(date_or_datetime):
 def transition_to_date(label, datetime):
     return label, datetime.date()
 
-def build_transitions(issues):
-    """Create a list of transitions from a list of issues.
-    """
-    return [Transitions(i.opened_at, i.closed_at, workflow_transitions=i.label_events) for i in issues]
-
-
 class Transitions(Sequence):
 
     def __init__(self, opened, closed=None, workflow_transitions=[]):
@@ -59,13 +53,6 @@ class Transitions(Sequence):
 
     def __len__(self):
         return self._transitions.__len__()
-
-    def __eq__(self, other):
-        return (self._transitions) == (other._transitions)
-
-    def __repr__(self):
-        return "%s"%(repr(self._transitions))
-
 
 
 DEFAULT_SERIES = ['opened', 'workflow::Ready', 'workflow::In Progress', 'workflow::Code Review', 'closed']
@@ -173,15 +160,11 @@ class WorkflowHistory(object):
         return matrix
 
     def _add(self, matrix, label, start_date, end_date):
-        try:
-            # find index of label in series
-            series_index = self._series.index(label)
-            # loop through dates included in the time window.
-            for d in self._labels_time_window(start_date, end_date):
-                date_index = self.included_dates.index(d)
-                matrix[series_index][date_index] += 1
-        except ValueError:
-            pass
+        series_index = self._series.index(label)
+        # loop through dates included in the time window.
+        for d in self._labels_time_window(start_date, end_date):
+            date_index = self.included_dates.index(d)
+            matrix[series_index][date_index] += 1
 
     def _labels_time_window(self, start, end):
         inside_start = start if start > self.included_dates[0] else self.included_dates[0]

@@ -6,7 +6,7 @@ from random import randrange
 
 # XXX date handling needs to be cleaned up
 from gl_analytics.metrics import daterange, start_date_for_time_window, _resolve_date, \
-    build_transitions, WorkflowHistory, Transitions
+    WorkflowHistory, Transitions
 
 # dates of transitions in test, unless otherwise provided
 created_at = datetime.datetime(2021, 3, 10)
@@ -68,19 +68,6 @@ def test_transitions_is_sequence():
 
     print(f"expected {expected_list} to actual {list(actual)}")
     assert expected_list == list(actual)
-
-def test_build_transitions_from_issues():
-    from gl_analytics.issues import Issue
-    wfData =  [
-        ('ready', datetime.datetime(2021,3,14,15,15, tzinfo=datetime.timezone.utc)),
-        ('in progress', datetime.datetime(2021, 3,15,10,tzinfo=datetime.timezone.utc)),
-        ('done', datetime.datetime(2021, 3,16,10,tzinfo=datetime.timezone.utc))
-    ]
-
-    issues = [Issue(1, 2, created_at, label_events=wfData), Issue(2, 2, created_at, label_events=wfData)]
-    transitions = build_transitions(issues)
-    assert len(transitions) == 2
-    assert all([len(t)==4 for t in transitions]) # opened, ready, in progress, done
 
 def test_workflow_requires_date_object_for_start():
     with pytest.raises(ValueError):

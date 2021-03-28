@@ -2,11 +2,17 @@
 import os
 from dotenv import load_dotenv
 from .issues import GitlabSession, GitlabIssuesRepository, GitlabWorkflowResolver
-from .metrics import build_transitions, WorkflowHistory
+from .metrics import Transitions, WorkflowHistory
+
+
+def build_transitions(issues):
+    """Create a list of transitions from a list of issues.
+    """
+    return [Transitions(i.opened_at, i.closed_at, workflow_transitions=i.label_events) for i in issues]
 
 def main(repository=None):
     if not repository:
-        raise TypeError()
+        raise ValueError()
 
     issues = repository.list()
     # grab all the transitions from the elements in the list

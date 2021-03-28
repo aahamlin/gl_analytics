@@ -63,7 +63,7 @@ class GitlabIssuesRepository(AbstractRepository):
         resolvers: resolve additional fields
         """
         if not group or not milestone:
-            raise SyntaxError('Requires group and milestone')
+            raise ValueError('Requires group and milestone')
 
         self._session = session
         self._group = group
@@ -193,9 +193,6 @@ class GitlabWorkflowResolver(object):
 
         Return None for non-qualifying label events.
        """
-        if 'label' not in event:
-            return None
-
         if not event['label']['name'].startswith(self._scope):
             return None
 

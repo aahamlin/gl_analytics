@@ -36,8 +36,12 @@ def test_gitlab_session_adds_access_token():
 
     session = issues.GitlabSession(access_token="x", request_factory=fake)
     session.get("https://gitlab.com/api/v4/groups/gozynta/issues")
-    assert 'PRIVATE-TOKEN' in fake.call_instances[-1].headers
+    assert 'PRIVATE-TOKEN' in fake.call_instances[-1].headers, 'Token missing from headers'
 
+def test_request_factory_gets(requests_mock):
+    requests_mock.get('https://mock-test.com', text='data')
+    req = issues.RequestFactory()
+    assert 'data' == req.get('https://mock-test.com').text
 
 def test_issue_builder_from_dict():
 
@@ -66,6 +70,11 @@ def test_issue_builder_from_dict():
     print(f"expected {expected} to actual {actual}")
     assert expected == actual
 
+def test_repo_requires_group_and_milestone():
+    with pytest.raises(ValueError):
+        issues.GitlabIssuesRepository(issues.Session(), milestone="foo")
+    with pytest.raises(ValueError):
+        issues.GitlabIssuesRepository(issues.Session(), group="foo")
 
 def test_repo_list_pagination():
     """Make sure we page correctly.
@@ -101,7 +110,7 @@ def test_repo_list_pagination():
     assert issue_list[0] and issue_list[0].issue_id == 2
     assert issue_list[1] and issue_list[1].issue_id == 3
 
-def test_workflows_resolve_and_extract_transitions():
+def test_workflows_resolver_calculates_label_events():
     resp = []
     resp.append(build_http_response(
         200,
@@ -125,3 +134,28 @@ def test_workflows_resolve_and_extract_transitions():
 
     assert len(issue_list) == 1
     assert len(issue_list[0].label_events) == 2 # designing, in progress
+
+def test_workflows_resolver_skips_non_qualifying_events():
+    resp = []
+    resp.append(build_http_response(
+        200,
+        bytes=io.BytesIO(b'[{"id":8000234,"iid":2,"project_id":"8273019","title":"test title","created_at":"2021-03-09T17:59:43.041Z"}]')))
+
+    resp.append(build_http_response(
+        status_code=200,
+        # XXX load payload from string to bytes more easily...
+        bytes=io.BytesIO(b'[{"created_at": "2021-02-09T16:59:37.783Z","resource_type": "Issue","label":{"id": 18205357,"name": "workflow::Designing"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205410,"name": "NonQualifyingLabel"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205357,"name": "workflow::Designing"},"action": "remove"}]')))
+
+    fake = FakeRequestFactory()
+    fake.responses = resp
+    session = issues.GitlabSession(access_token="x", request_factory=fake)
+
+    repo = issues.GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3", resolvers=[issues.GitlabWorkflowResolver])
+    issue_list = repo.list()
+
+    assert len(fake.call_instances) == 2
+    assert fake.call_instances[0].path == "/api/v4/groups/gozynta/issues"
+    assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/2/resource_label_events"
+
+    assert len(issue_list) == 1
+    assert len(issue_list[0].label_events) == 1 # designing
