@@ -7,7 +7,7 @@ from requests import Response
 
 import gl_analytics.issues as issues
 
-from . import FakeRequestFactory, build_http_response
+from . import FakeRequestFactory, build_fake_http_response
 
 def test_issues_error():
     assert isinstance(issues.IssuesError(), Exception)
@@ -30,7 +30,7 @@ def test_gitlab_session():
 
 def test_gitlab_session_adds_access_token():
     fake = FakeRequestFactory()
-    fake.responses.append(build_http_response(
+    fake.responses.append(build_fake_http_response(
         200,
         bytes=io.BytesIO(b'[{"id":8000234,"iid":2,"project_id":"8273019","title":"test title","created_at":"2021-03-09T17:59:43.041Z"}]')))
 
@@ -84,12 +84,12 @@ def test_repo_list_pagination():
     """
 
     resp = []
-    resp.append(build_http_response(
+    resp.append(build_fake_http_response(
         200,
         headers={'link': '<https://gitlab.com/api/v4/groups/gozynta/issues?id=gozynta&milestone=mb_v1.3&non_archived=true&order_by=created_at&page=2&pagination=keyset&per_page=5&sort=desc&state=all&with_labels_details=false>; rel="next", <https://gitlab.com/api/v4/groups/gozynta/issues?id=gozynta&milestone=mb_v1.3&non_archived=true&order_by=created_at&page=1&pagination=keyset&per_page=5&sort=desc&state=all&with_labels_details=false>; rel="first", <https://gitlab.com/api/v4/groups/gozynta/issues?id=gozynta&milestone=mb_v1.3&non_archived=true&order_by=created_at&page=9&pagination=keyset&per_page=5&sort=desc&state=all&with_labels_details=false>; rel="last"'},
         bytes=io.BytesIO(b'[{"id":8000234,"iid":2,"project_id":"8273019","title":"test title","created_at":"2021-03-09T17:59:43.041Z"}]')))
 
-    resp.append(build_http_response(
+    resp.append(build_fake_http_response(
         200,
         headers={'link': '<https://gitlab.com/api/v4/groups/gozynta/issues?id=gozynta&milestone=mb_v1.3&non_archived=true&order_by=created_at&page=1&pagination=keyset&per_page=5&sort=desc&state=all&with_labels_details=false>; rel="first", <https://gitlab.com/api/v4/groups/gozynta/issues?id=gozynta&milestone=mb_v1.3&non_archived=true&order_by=created_at&page=9&pagination=keyset&per_page=5&sort=desc&state=all&with_labels_details=false>; rel="last"'},
         bytes=io.BytesIO(b'[{"id":8000235, "iid":3,"project_id":"8273019","title":"test title 2","created_at":"2021-03-09T17:59:43.041Z"}]')))
@@ -112,11 +112,11 @@ def test_repo_list_pagination():
 
 def test_workflows_resolver_calculates_label_events():
     resp = []
-    resp.append(build_http_response(
+    resp.append(build_fake_http_response(
         200,
         bytes=io.BytesIO(b'[{"id":8000234,"iid":2,"project_id":"8273019","title":"test title","created_at":"2021-03-09T17:59:43.041Z"}]')))
 
-    resp.append(build_http_response(
+    resp.append(build_fake_http_response(
         status_code=200,
         # XXX load payload from string to bytes more easily...
         bytes=io.BytesIO(b'[{"created_at": "2021-02-09T16:59:37.783Z","resource_type": "Issue","label":{"id": 18205357,"name": "workflow::Designing"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205410,"name": "workflow::In Progress"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205357,"name": "workflow::Designing"},"action": "remove"}]')))
@@ -137,11 +137,11 @@ def test_workflows_resolver_calculates_label_events():
 
 def test_workflows_resolver_skips_non_qualifying_events():
     resp = []
-    resp.append(build_http_response(
+    resp.append(build_fake_http_response(
         200,
         bytes=io.BytesIO(b'[{"id":8000234,"iid":2,"project_id":"8273019","title":"test title","created_at":"2021-03-09T17:59:43.041Z"}]')))
 
-    resp.append(build_http_response(
+    resp.append(build_fake_http_response(
         status_code=200,
         # XXX load payload from string to bytes more easily...
         bytes=io.BytesIO(b'[{"created_at": "2021-02-09T16:59:37.783Z","resource_type": "Issue","label":{"id": 18205357,"name": "workflow::Designing"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205410,"name": "NonQualifyingLabel"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205357,"name": "workflow::Designing"},"action": "remove"}]')))

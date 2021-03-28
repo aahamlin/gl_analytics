@@ -10,19 +10,15 @@ def build_transitions(issues):
     """
     return [Transitions(i.opened_at, i.closed_at, workflow_transitions=i.label_events) for i in issues]
 
-def main(repository=None):
-    if not repository:
-        raise ValueError()
-
+def main(access_token=None, group=None, milestone=None, days=30):
+    session = GitlabSession(access_token=access_token)
+    repository = GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3", resolvers=[GitlabWorkflowResolver])
     issues = repository.list()
     # grab all the transitions from the elements in the list
     transitions = build_transitions(issues)
-    wfh = CumulativeFlow(transitions, days=60)
+    wfh = CumulativeFlow(transitions, days=days)
     print(wfh.to_csv())
 
 if __name__ == "__main__":
     load_dotenv()
-    ACCESS_TOKEN = os.getenv('TOKEN')
-    session = GitlabSession(access_token=ACCESS_TOKEN)
-    issueRepo = GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3", resolvers=[GitlabWorkflowResolver])
-    main(session=session, repository=issueRepo)
+    main(access_token=os.getenv('TOKEN'), group="gozynta", milestone="mb_v1.3", days=30)

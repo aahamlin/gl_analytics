@@ -42,7 +42,7 @@ class FakeRequestInfo(object):
     def __str__(self):
         return f"path:{self.path}, params:{self.params}, headers:{self.headers}"
 
-def build_http_response(status_code, bytes=None, headers=None):
+def build_fake_http_response(status_code, bytes=None, headers=None):
     # simple setup of fake response data
     response = Response()
     response.status_code = status_code
