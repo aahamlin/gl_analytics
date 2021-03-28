@@ -38,6 +38,35 @@ def test_gitlab_session_adds_access_token():
     session.get("https://gitlab.com/api/v4/groups/gozynta/issues")
     assert 'PRIVATE-TOKEN' in fake.call_instances[-1].headers
 
+
+def test_issue_builder_from_dict():
+
+    wfData =  [
+        ('ready', '2021-03-14T15:15:00.000Z'),
+        ('in progress', '2021-03-15T10:00:00.000Z'),
+        ('done', '2021-03-16T10:00:00.000Z')
+    ]
+    data = {
+        'iid': 1,
+        'project_id': 3,
+        'created_at': '2021-03-14T12:00:00.000Z',
+        '_workflow': wfData
+    }
+
+    expectedOpenedAt = datetime.datetime(2021, 3,14, 12, tzinfo=datetime.timezone.utc)
+    expectedLabelEvents = [
+        ('ready', datetime.datetime(2021, 3, 14, 15, 15, 0, tzinfo=datetime.timezone.utc)),
+        ('in progress', datetime.datetime(2021, 3, 15, 10, 0, tzinfo=datetime.timezone.utc)),
+        ('done', datetime.datetime(2021, 3, 16, 10, 0, tzinfo=datetime.timezone.utc)),
+    ]
+
+    expected = issues.Issue(1, 3, expectedOpenedAt, label_events=expectedLabelEvents)
+
+    actual = issues.issue_from(data)
+    print(f"expected {expected} to actual {actual}")
+    assert expected == actual
+
+
 def test_repo_list_pagination():
     """Make sure we page correctly.
 
@@ -72,7 +101,7 @@ def test_repo_list_pagination():
     assert issue_list[0] and issue_list[0].issue_id == 2
     assert issue_list[1] and issue_list[1].issue_id == 3
 
-def test_issue_workflow_resolver():
+def test_workflows_resolve_and_extract_transitions():
     resp = []
     resp.append(build_http_response(
         200,
@@ -95,74 +124,4 @@ def test_issue_workflow_resolver():
     assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/2/resource_label_events"
 
     assert len(issue_list) == 1
-    wf = issue_list[0].workflow
-    assert wf != None
-    assert len(wf) > 0
-
-def test_repo_list_starts_with_opened():
-
-    fake = FakeRequestFactory()
-    fake.responses.append(build_http_response(
-        status_code=200,
-        # XXX load payload from string to bytes more easily...
-        bytes=io.BytesIO(b'[{"created_at": "2021-02-09T16:59:37.783Z","resource_type": "Issue","label":{"id": 18205357,"name": "workflow::Designing"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205410,"name": "workflow::In Progress"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205357,"name": "workflow::Designing"},"action": "remove"}]')))
-
-    session = issues.GitlabSession(access_token="x", request_factory=fake)
-
-    item = {'iid': 3, 'project_id': '8273019', 'created_at': '2021-02-08T16:59:37.783Z' }
-
-    resolver = issues.GitlabWorkflowResolver(session)
-    workflow = resolver.resolve(item)
-    wf = workflow['_workflow']
-
-    assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/3/resource_label_events"
-    assert wf[0] == ('opened', date_parser.parse("2021-02-08T16:59:37.783Z"))
-
-def test_repo_list_workflow_transitions():
-
-    fake = FakeRequestFactory()
-    fake.responses.append(build_http_response(
-        status_code=200,
-        # XXX load payload from string to bytes more easily...
-        bytes=io.BytesIO(b'[{"created_at": "2021-02-09T16:59:37.783Z","resource_type": "Issue","label":{"id": 18205357,"name": "workflow::Designing"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205410,"name": "workflow::In Progress"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205357,"name": "workflow::Designing"},"action": "remove"}]')))
-
-    session = issues.GitlabSession(access_token="x", request_factory=fake)
-
-    item = {'iid': 3, 'project_id': '8273019', 'created_at': '2021-02-09T16:59:37.783Z' }
-
-    resolver = issues.GitlabWorkflowResolver(session)
-    workflow = resolver.resolve(item)
-    wf = workflow['_workflow']
-    assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/3/resource_label_events"
-    # steps:  +opened, +desiging, -opened, +inprogress, -designing
-    assert len(wf) == 3
-    cols = [list(t) for t in zip(*wf)]
-    # checks steps
-    assert all([a==b for a, b in zip(cols[0], ['opened', 'workflow::Designing', 'workflow::In Progress'])])
-    # checks dates
-    assert all([a==b for a, b in zip(cols[1], [
-        date_parser.parse('2021-02-09T16:59:37.783Z'),
-        date_parser.parse('2021-02-09T16:59:37.783Z'),
-        date_parser.parse('2021-02-09T17:00:49.416Z')
-    ])])
-
-
-def test_repo_list_ends_with_closed():
-
-    fake = FakeRequestFactory()
-    fake.responses.append(build_http_response(
-        status_code=200,
-        # XXX load payload from string to bytes more easily...
-        bytes=io.BytesIO(b'[{"created_at": "2021-02-09T16:59:37.783Z","resource_type": "Issue","label":{"id": 18205357,"name": "workflow::Designing"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205410,"name": "workflow::In Progress"},"action": "add"},{"created_at": "2021-02-09T17:00:49.416Z","resource_type": "Issue","label": {"id": 18205357,"name": "workflow::Designing"},"action": "remove"}]')))
-
-    session = issues.GitlabSession(access_token="x", request_factory=fake)
-
-    item = {'iid': 3, 'project_id': '8273019', 'created_at': '2021-02-09T16:59:37.783Z', 'closed_at': '2021-02-15T00:00:00.000Z' }
-
-    resolver = issues.GitlabWorkflowResolver(session)
-    workflow = resolver.resolve(item)
-
-    wf = workflow['_workflow']
-
-    assert fake.call_instances[-1].path == "/api/v4/projects/8273019/issues/3/resource_label_events"
-    assert wf[-1] == ('closed', date_parser.parse("2021-02-15T00:00:00.000Z"))
+    assert len(issue_list[0].label_events) == 2 # designing, in progress

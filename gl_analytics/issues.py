@@ -2,8 +2,10 @@
 """
 import sys
 import json
+import datetime
 import requests
 
+from collections.abc import Sequence
 from dateutil import parser as date_parser
 from urllib.parse import urlencode
 
@@ -105,7 +107,7 @@ class GitlabIssuesRepository(AbstractRepository):
             #print(f'processing {count} items');
             for item in payload:
                 item = self._resolve_fields(item)
-                yield Issue(item)
+                yield issue_from(item)
 
             if r1.links and 'next' in r1.links:
                 # setup next page request
@@ -174,22 +176,15 @@ class GitlabWorkflowResolver(object):
        """
         # every workflow starts with 'opened'
         events = []
-        events.append(('opened', date_parser.parse(item['created_at'])))
 
         for label_event in payload:
             try:
-                action_name, step_name, action_date = self._get_workflow_step(label_event)
+                action_name, step_name, action_datetime = self._get_workflow_step(label_event)
                 if action_name == 'add':
-                    events.append((step_name, action_date))
+                    events.append((step_name, action_datetime))
             except TypeError:
                 # non-qualifying label event returned None
                 pass
-
-        # closed issues will end with 'closed'
-        if 'closed_at' in item:
-            #print('events before close', events)
-            closed_at = date_parser.parse(item['closed_at'])
-            events.append(('closed', closed_at))
 
         return events
 
@@ -206,23 +201,37 @@ class GitlabWorkflowResolver(object):
 
         step_name = event['label']['name']
         action_name = event['action']
-        action_date = date_parser.parse(event['created_at'])
+        action_date = event['created_at']
 
         return action_name, step_name, action_date
 
 
+def issue_from(item):
+    #print('creating Issue from item', json.dumps(item))
+    issue_id = item['iid']
+    project_id = item['project_id']
+    opened_at = date_parser.parse(item['created_at'])
+    closed_at_str = item.get('closed_at')
+    closed_at = date_parser.parse(closed_at_str) if closed_at_str else None
+    label_events = None
+    if '_workflow' in item:
+        label_events = list(map(lambda x: (x[0], date_parser.parse(x[1])), item['_workflow']))
+
+    issue = Issue(issue_id, project_id, opened_at, closed_at=closed_at, label_events=label_events)
+    return issue
+
 class Issue(object):
 
-    def __init__(self, item):
-        #print('creating Issue from item', json.dumps(item))
-        self._issue_id = item['iid']
-        self._project_id = item['project_id']
-        self._opened_at = date_parser.parse(item['created_at'])
-        closed_at = item.get('closed_at')
-        self._closed_at = date_parser.parse(closed_at) if closed_at else None
+    def __init__(self, issue_id, project_id, opened_at, closed_at=None, label_events=None):
+        """initializes an issue.
 
-        if '_workflow' in item:
-            self._workflow = item['_workflow']
+        label_events: array of tuples containing label:str, created_at:datetime
+        """
+        self._issue_id = issue_id
+        self._project_id = project_id
+        self._opened_at = opened_at
+        self._closed_at = closed_at
+        self._label_events = label_events
 
     @property
     def issue_id(self):
@@ -241,26 +250,11 @@ class Issue(object):
         return self._closed_at
 
     @property
-    def workflow(self):
-        return self._workflow
+    def label_events(self):
+        return self._label_events
 
-    @workflow.setter
-    def workflow(self, wf):
-        self._workflow = wf
-
-    @workflow.deleter
-    def workflow(self):
-        del self._workflow
+    def __eq__(self, other):
+        return (self.issue_id, self.project_id, self.opened_at, self.closed_at, self.label_events) == (other.issue_id, other.project_id, other.opened_at, other.closed_at, other.label_events)
 
     def __str__(self):
-        return f"Issue(id:{self.issue_id}, p:{self.project_id}, o:{self.opened_at}, c:{self.closed_at}, w:{self.workflow})"
-
-
-def find_issues(session, group=None, milestone=None):
-    """Returns all issues by group and milestone and their entire workflow history.
-
-    session: *required* Session object
-    """
-    repo = GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3", resolvers=[GitlabWorkflowResolver])
-    issues = repo.list()
-    return issues
+        return f"Issue(id:{self.issue_id}, p:{self.project_id}, o:{self.opened_at}, c:{self.closed_at}, e:{self.label_events})"
