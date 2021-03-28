@@ -61,7 +61,7 @@ class MetricsError(Exception):
     pass
 
 # XXX Rename CumulativeFlow
-class WorkflowHistory(object):
+class CumulativeFlow(object):
     def __init__(self, transitions, series=DEFAULT_SERIES, days=30, end_date=None, start_date=None):
 
         if start_date and not isinstance(start_date, datetime.date):

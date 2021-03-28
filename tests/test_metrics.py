@@ -6,7 +6,7 @@ from random import randrange
 
 # XXX date handling needs to be cleaned up
 from gl_analytics.metrics import daterange, start_date_for_time_window, _resolve_date, \
-    WorkflowHistory, Transitions
+    CumulativeFlow, Transitions
 
 # dates of transitions in test, unless otherwise provided
 created_at = datetime.datetime(2021, 3, 10)
@@ -71,32 +71,32 @@ def test_transitions_is_sequence():
 
 def test_workflow_requires_date_object_for_start():
     with pytest.raises(ValueError):
-        WorkflowHistory([], series=series, start_date='2021-03-10T12:00:00.000Z')
+        CumulativeFlow([], series=series, start_date='2021-03-10T12:00:00.000Z')
 
 def test_workflow_supports_datetime_for_start_date():
     expected = datetime.datetime(2021, 3, 10, 12, tzinfo=datetime.timezone.utc)
-    wfh = WorkflowHistory([], series=series, start_date=expected, days=1)
+    wfh = CumulativeFlow([], series=series, start_date=expected, days=1)
     assert len(wfh.included_dates) == 1
     wfh.included_dates[0] = expected
 
 def test_workflow_supports_datetime_for_end_date():
     expected = datetime.datetime(2021, 3, 10, 12, tzinfo=datetime.timezone.utc)
-    wfh = WorkflowHistory([], series=series, end_date=expected, days=1)
+    wfh = CumulativeFlow([], series=series, end_date=expected, days=1)
     assert len(wfh.included_dates) == 1
     wfh.included_dates[0] = expected
 
 def test_workflow_requires_date_object_for_end():
     with pytest.raises(ValueError):
-        WorkflowHistory([], series=series, end_date='2021-03-10T12:00:00.000Z')
+        CumulativeFlow([], series=series, end_date='2021-03-10T12:00:00.000Z')
 
 def test_workflow_enforces_one_day_minimum():
     with pytest.raises(ValueError):
-        WorkflowHistory([], series=series, days=0)
+        CumulativeFlow([], series=series, days=0)
     with pytest.raises(ValueError):
-        WorkflowHistory([], series=series, days=-1)
+        CumulativeFlow([], series=series, days=-1)
 
 def test_workflow_honors_today_with_days():
-    wfh = WorkflowHistory([], series=series, days=5)
+    wfh = CumulativeFlow([], series=series, days=5)
     today = datetime.datetime.utcnow().date()
     fiveDaysAgo = start_date_for_time_window(today, 5)
     assert len(wfh.included_dates) == 5
@@ -105,17 +105,17 @@ def test_workflow_honors_today_with_days():
 
 def test_workflow_honors_end_date_default_days():
     # default 30 days
-    wfh = WorkflowHistory([], series=series, end_date=datetime.date(2021, 3, 30))
+    wfh = CumulativeFlow([], series=series, end_date=datetime.date(2021, 3, 30))
     assert len(wfh.included_dates) == 30
     assert wfh.included_dates[-1] == datetime.date(2021, 3, 30)
     assert wfh.included_dates[0] == datetime.date(2021, 3, 1)
 
 def test_workflow_honors_start_date():
-    wfh = WorkflowHistory([], series=series, start_date=datetimes[0], end_date=datetimes[-1])
+    wfh = CumulativeFlow([], series=series, start_date=datetimes[0], end_date=datetimes[-1])
     assert wfh.included_dates[0] == datetimes[0].date()
 
 def test_workflow_honors_end_date():
-    wfh = WorkflowHistory([], series=series, start_date=datetimes[0], end_date=datetimes[-1])
+    wfh = CumulativeFlow([], series=series, start_date=datetimes[0], end_date=datetimes[-1])
     assert wfh.included_dates[-1] == datetimes[-1].date()
 
 def test_collect_values():
@@ -128,7 +128,7 @@ def test_collect_values():
         ])
     ]
 
-    wfh = WorkflowHistory(list_of_Ts, series=series, start_date=datetimes[0].date(), end_date=datetimes[-1].date())
+    wfh = CumulativeFlow(list_of_Ts, series=series, start_date=datetimes[0].date(), end_date=datetimes[-1].date())
     df = wfh._get_data_frame()
     print(df.to_csv())
     #            todo  inprogress  review  done
@@ -160,7 +160,7 @@ def test_events_on_same_day_record_last_event():
         ])
     ]
 
-    wfh = WorkflowHistory(list_of_Ts, series=series, start_date=datetimes[0].date(), end_date=datetimes[-1].date())
+    wfh = CumulativeFlow(list_of_Ts, series=series, start_date=datetimes[0].date(), end_date=datetimes[-1].date())
     df = wfh._get_data_frame()
     print(df.to_csv())
 
@@ -186,7 +186,7 @@ def test_events_in_days_from_today():
         ])
     ]
 
-    wfh = WorkflowHistory(list_of_Ts, series=series, days=5)
+    wfh = CumulativeFlow(list_of_Ts, series=series, days=5)
     df = wfh._get_data_frame()
     print(df.to_csv())
 
@@ -204,7 +204,7 @@ def test_step_before_time_window():
         ])
     ]
 
-    wfh = WorkflowHistory(list_of_Ts, series=series, start_date=datetimes[0], end_date=datetimes[-1])
+    wfh = CumulativeFlow(list_of_Ts, series=series, start_date=datetimes[0], end_date=datetimes[-1])
     df = wfh._get_data_frame()
     print(df.to_csv())
 
@@ -224,7 +224,7 @@ def test_step_backwards():
         ])
     ]
 
-    wfh = WorkflowHistory(list_of_Ts, series=series,  start_date=datetimes[0], end_date=datetimes[-1])
+    wfh = CumulativeFlow(list_of_Ts, series=series,  start_date=datetimes[0], end_date=datetimes[-1])
     df = wfh._get_data_frame()
     print(df.to_csv())
 
@@ -244,7 +244,7 @@ def test_transitions_same_day_with_closed():
     ]
 
     series1 = ['opened'] + series + ['closed']
-    wfh = WorkflowHistory(list_of_Ts, series=series1, start_date=datetimes[0], end_date=datetimes[-1])
+    wfh = CumulativeFlow(list_of_Ts, series=series1, start_date=datetimes[0], end_date=datetimes[-1])
     df = wfh._get_data_frame()
     print(df.to_csv())
 
@@ -265,7 +265,7 @@ def test_created_to_closed_same_day():
 
     series1 = ['opened'] + series + ['closed']
 
-    wfh = WorkflowHistory(list_of_Ts, series=series1, start_date=datetimes[0], end_date=datetimes[-1])
+    wfh = CumulativeFlow(list_of_Ts, series=series1, start_date=datetimes[0], end_date=datetimes[-1])
     df = wfh._get_data_frame()
     print(df.to_csv())
 

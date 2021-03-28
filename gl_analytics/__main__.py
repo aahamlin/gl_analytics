@@ -2,7 +2,7 @@
 import os
 from dotenv import load_dotenv
 from .issues import GitlabSession, GitlabIssuesRepository, GitlabWorkflowResolver
-from .metrics import Transitions, WorkflowHistory
+from .metrics import Transitions, CumulativeFlow
 
 
 def build_transitions(issues):
@@ -17,7 +17,7 @@ def main(repository=None):
     issues = repository.list()
     # grab all the transitions from the elements in the list
     transitions = build_transitions(issues)
-    wfh = WorkflowHistory(transitions, days=60)
+    wfh = CumulativeFlow(transitions, days=60)
     print(wfh.to_csv())
 
 if __name__ == "__main__":
