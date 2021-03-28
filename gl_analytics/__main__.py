@@ -2,14 +2,16 @@
 import os
 from dotenv import load_dotenv
 from .issues import GitlabSession, GitlabIssuesRepository, GitlabWorkflowResolver
-from .metrics import WorkflowHistory
+from .metrics import build_transitions, WorkflowHistory
 
 def main(repository=None):
     if not repository:
         raise TypeError()
 
     issues = repository.list()
-    wfh = WorkflowHistory(issues, days=60)
+    # grab all the transitions from the elements in the list
+    transitions = build_transitions(issues)
+    wfh = WorkflowHistory(transitions, days=60)
     print(wfh.to_csv())
 
 if __name__ == "__main__":

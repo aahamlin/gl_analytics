@@ -2,7 +2,8 @@
 import datetime
 import pandas as pd
 
-from itertools import chain
+from itertools import chain, starmap
+from collections.abc import Sequence
 
 def daterange(start_date, end_date):
     """Generate dates from start to end, exclusive.
@@ -18,15 +19,53 @@ def start_date_for_time_window(end_date, days):
     """
     if days<1:
         raise ValueError()
+
     return (end_date-datetime.timedelta(days-1))
 
 def _resolve_date(date_or_datetime):
-    if isinstance(date_or_datetime, datetime.datetime):
+    if not isinstance(date_or_datetime, datetime.date):
+        raise ValueError()
+
+    if hasattr(date_or_datetime, 'date'):
         return date_or_datetime.date()
-    elif isinstance(date_or_datetime, datetime.date):
+    else:
         return date_or_datetime
 
-    raise ValueError(datetime.datetime)
+def transition_to_date(label, datetime):
+    return label, datetime.date()
+
+def build_transitions(issues):
+    """Create a list of transitions from a list of issues.
+    """
+    return [Transitions(i.opened_at, i.closed_at, workflow_transitions=i.label_events) for i in issues]
+
+
+class Transitions(Sequence):
+
+    def __init__(self, opened, closed=None, workflow_transitions=[]):
+        print(f'initializing transition opened {opened} with wf {workflow_transitions}')
+        transitions = [('opened', opened)] + workflow_transitions
+        if closed:
+            transitions += [('closed', closed)]
+
+        print(f'transitions {transitions}')
+        self._transitions = transitions
+
+    def by_date(self):
+        return list(starmap(transition_to_date, self._transitions))
+
+    def __getitem__(self, key):
+        return self._transitions.__getitem__(key)
+
+    def __len__(self):
+        return self._transitions.__len__()
+
+    def __eq__(self, other):
+        return (self._transitions) == (other._transitions)
+
+    def __repr__(self):
+        return "%s"%(repr(self._transitions))
+
 
 
 DEFAULT_SERIES = ['opened', 'workflow::Ready', 'workflow::In Progress', 'workflow::Code Review', 'closed']
@@ -34,20 +73,33 @@ DEFAULT_SERIES = ['opened', 'workflow::Ready', 'workflow::In Progress', 'workflo
 class MetricsError(Exception):
     pass
 
+# XXX Rename CumulativeFlow
 class WorkflowHistory(object):
+    def __init__(self, transitions, series=DEFAULT_SERIES, days=30, end_date=None, start_date=None):
 
-    def __init__(self, issues, series=DEFAULT_SERIES, days=30, end_date=datetime.datetime.utcnow().date(), start_date=None):
+        if start_date and not isinstance(start_date, datetime.date):
+            raise ValueError('start_date must be datetime.date')
 
-        # build include_dates
-        if end_date and start_date:
+        if end_date and not isinstance(end_date, datetime.date):
+            raise ValueError('end_date must be datetime.date')
+
+        if days < 1:
+            raise ValueError('days must include at least 1 day')
+
+        if hasattr(start_date, 'date'):
+            start_date = start_date.date()
+
+        if hasattr(end_date, 'date'):
+            end_date = end_date.date()
+
+        if isinstance(end_date, datetime.date) and isinstance(start_date, datetime.date):
             self._included_dates = self._calculate_include_dates(start_date, end_date)
-        elif days:
-            self._included_dates = self._calculate_include_dates(*self._data_range_from_days(end_date, days))
         else:
-            raise MetricsError('Must specify days or data_range tuple')
+            end_date = end_date if end_date else datetime.datetime.now(tz=datetime.timezone.utc).date()
+            self._included_dates = self._calculate_include_dates(*self._data_range_from_days(end_date, days))
 
         self._series = series
-        self._transitions = [e for e in chain([i.workflow for i in issues])]
+        self._transitions = transitions
         self._matrix = self._build_matrix()
 
     @property
@@ -92,17 +144,20 @@ class WorkflowHistory(object):
 
         matrix = [[0 for _ in self.included_dates] for _ in self._series]
 
-        for issue in self._transitions:
-            # filter issue to labels in our series
-            labels, dates = zip(*filter(lambda tx: tx[0] in self._series,
-                                            map(lambda x: (x[0], _resolve_date(x[1])), issue)))
+        for wf_transition in self._transitions:
+            # filter issue to labels in our series and squash datetimes to date only values
+            transitions = [(s, t) for s, t in wf_transition.by_date() if s in self._series]
+            print(f'filtered transitions {transitions}')
+
+            labels, dates = list(zip(*transitions))
+            print(f'found labels {labels} and dates {dates}')
 
             # XXX Needs to terminate at the CLOSE of an issue
             opened_date = dates[0]
 
             # Same day event: add last series label and time only
             if all([d==opened_date for d in dates]):
-                self._add(matrix, labels[-1], opened_date, opened_date)
+                self._add(matrix, labels[-1], opened_date, datetime.date.max)
                 continue
 
             # Multiple day events: add each series label with start and end times
@@ -111,7 +166,6 @@ class WorkflowHistory(object):
                 try:
                     end_date = dates[idx+1]
                 except IndexError:
-                    # final label
                     end_date = datetime.date.max
 
                 self._add(matrix, label, start_date, end_date)
