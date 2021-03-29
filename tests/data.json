@@ -1,0 +1,16 @@
+{
+    "issues": {
+        "iid2": {
+            "body": "[{\"id\":8000234,\"iid\":2,\"project_id\":\"8273019\",\"title\":\"test title\",\"created_at\":\"2021-03-09T17:59:43.041Z\"}]",
+            "headers": {"link": "<https://gitlab.com/api/v4/groups/gozynta/issues?id=gozynta&milestone=mb_v1.3&non_archived=true&order_by=created_at&page=2&pagination=keyset&per_page=5&sort=desc&state=all&with_labels_details=false>; rel=\"next\", <https://gitlab.com/api/v4/groups/gozynta/issues?id=gozynta&milestone=mb_v1.3&non_archived=true&order_by=created_at&page=1&pagination=keyset&per_page=5&sort=desc&state=all&with_labels_details=false>; rel=\"first\", <https://gitlab.com/api/v4/groups/gozynta/issues?id=gozynta&milestone=mb_v1.3&non_archived=true&order_by=created_at&page=9&pagination=keyset&per_page=5&sort=desc&state=all&with_labels_details=false>; rel=\"last\""
+                       }
+        },
+        "iid3": {
+            "body": "[{\"id\":8000235, \"iid\":3,\"project_id\":\"8273019\",\"title\":\"test title 2\",\"created_at\":\"2021-03-09T17:59:43.041Z\"}]"
+        }
+    },
+    "resource_label_events": [
+        "[{\"created_at\": \"2021-02-09T16:59:37.783Z\",\"resource_type\": \"Issue\",\"label\":{\"id\": 18205357,\"name\": \"workflow::Designing\"},\"action\": \"add\"},{\"created_at\": \"2021-02-09T17:00:49.416Z\",\"resource_type\": \"Issue\",\"label\": {\"id\": 18205410,\"name\": \"workflow::In Progress\"},\"action\": \"add\"},{\"created_at\": \"2021-02-09T17:00:49.416Z\",\"resource_type\": \"Issue\",\"label\": {\"id\": 18205357,\"name\": \"workflow::Designing\"},\"action\": \"remove\"}]",
+        "[{\"created_at\": \"2021-02-09T16:59:37.783Z\",\"resource_type\": \"Issue\",\"label\":{\"id\": 18205357,\"name\": \"workflow::Designing\"},\"action\": \"add\"},{\"created_at\": \"2021-02-09T17:00:49.416Z\",\"resource_type\": \"Issue\",\"label\": {\"id\": 18205410,\"name\": \"NonQualifyingLabel\"},\"action\": \"add\"},{\"created_at\": \"2021-02-09T17:00:49.416Z\",\"resource_type\": \"Issue\",\"label\": {\"id\": 18205357,\"name\": \"workflow::Designing\"},\"action\": \"remove\"}]"
+    ]
+}
