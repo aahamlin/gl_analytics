@@ -7,7 +7,9 @@ a tool to access the state events necessary to build a CFD from the ~workflow la
 
 ## Todos
 
-- Code Review is not automated so transition to closed should account for that in time overlaps
+- Create installable (setup.cfg or newer toml format?)
+- Add output/export class(es) for generating Images, CSV, etc
+- Refactor areas marked with XXX comments
 
 ## Create personal access token
 

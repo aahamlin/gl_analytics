@@ -12,11 +12,9 @@ from .metrics import Transitions, CumulativeFlow
 #      --scope-include='Ready, In Progress, Code Review'
 #    2. Query GitLab to validate scoped labels exist (no typos) and retrieve their IDs, then use label
 #      IDs, instead of strings, when processing resource_label_events.
-#
 #    3. Figure out how to provide scope to the GitlabWorkflowResolver class __init__ function.
 #      3a. Either, figure a way to pass arguments down the heirarchy
 #      3b. Subclass GitlabWorkflowResolver with specific scopes.
-#
 
 
 DEFAULT_SERIES = [
