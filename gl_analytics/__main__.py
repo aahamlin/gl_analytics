@@ -47,7 +47,7 @@ def main(access_token=None, group=None, milestone=None, days=30):
     issues = repository.list()
     # grab all the transitions from the elements in the list
     transitions = build_transitions(issues)
-    wfh = CumulativeFlow(transitions, days=days, series=DEFAULT_SERIES)
+    wfh = CumulativeFlow(transitions, days=days, labels=DEFAULT_SERIES)
     print(wfh.to_csv())
 
 

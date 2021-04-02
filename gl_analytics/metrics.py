@@ -50,7 +50,7 @@ class CumulativeFlow(object):
     def __init__(
         self,
         transitions,
-        series=["opened", "closed"],
+        labels=["opened", "closed"],
         days=30,
         end_date=None,
         start_date=None,
@@ -85,7 +85,7 @@ class CumulativeFlow(object):
                 *self._data_range_from_days(end_date, days)
             )
 
-        self._series = series
+        self._labels = labels
         # Cumulativeflow only records changes per day, so normalize all transition to dates
         self._transitions = list([starmap(transition_to_date, t) for t in transitions])
         self._matrix = self._build_matrix()
@@ -96,8 +96,8 @@ class CumulativeFlow(object):
         return self._included_dates
 
     @property
-    def series(self):
-        return self._series
+    def labels(self):
+        return self._labels
 
     def _calculate_include_dates(self, start, end):
         # add 1 day because generator excludes end, as matches Python generators expectations
@@ -115,9 +115,9 @@ class CumulativeFlow(object):
     def _get_data_frame(self):
         """Build a DataFrame for processing (metrics, plotting, etc)."""
         # index by dates within this report's time window
-        data = {k: v for k, v in zip(self._series, self._matrix)}
+        data = {k: v for k, v in zip(self._labels, self._matrix)}
         indexes = [str(d) for d in self.included_dates]
-        df = pd.DataFrame(data, index=indexes, columns=self.series)
+        df = pd.DataFrame(data, index=indexes, columns=self.labels)
 
         return df
 
@@ -128,35 +128,37 @@ class CumulativeFlow(object):
         # 'opened' is always the first transition, even if its not in the time window
         # when all transitions for an issue occur on the same day, record the last transition
 
-        matrix = [[0 for _ in self.included_dates] for _ in self._series]
+        matrix = [[0 for _ in self.included_dates] for _ in self._labels]
 
         for wf_transitions in self._transitions:
-            # filter issue to labels in our series and squash datetimes to date only values
-            transitions = [(s, t) for s, t in wf_transitions if s in self._series]
+            # takes all transitions into account, in particular opened and closed datetimes
+            transitions = [(s, t) for s, t in wf_transitions]
 
-            labels, dates = list(zip(*transitions))
+            tx_labels, dates = list(zip(*transitions))
 
             opened_date = dates[0]
 
             # Same day event: add last series label and time only
             if all([d == opened_date for d in dates]):
-                self._add(matrix, labels[-1], opened_date, datetime.date.max)
+                self._add(matrix, tx_labels[-1], opened_date, datetime.date.max)
                 continue
 
             # Multiple day events: add each series label with start and end times
-            for idx, label in enumerate(labels):
+            for idx, label in enumerate(tx_labels):
                 start_date = dates[idx]
                 try:
                     end_date = dates[idx + 1]
                 except IndexError:
                     end_date = datetime.date.max
 
-                self._add(matrix, label, start_date, end_date)
+                if label in self.labels:
+                    self._add(matrix, label, start_date, end_date)
 
         return matrix
 
-    def _add(self, matrix, label, start_date, end_date):
-        series_index = self._series.index(label)
+    def _add(self, matrix, tx_label, start_date, end_date):
+        # add transitions that are in our label collection
+        series_index = self.labels.index(tx_label)
         # loop through dates included in the time window.
         for d in self._labels_time_window(start_date, end_date):
             date_index = self.included_dates.index(d)
