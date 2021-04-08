@@ -5,6 +5,18 @@ The GitLab product has an open [issue](https://gitlab.com/gitlab-org/gitlab/-/is
 Using the GitLab [resource state events](https://docs.gitlab.com/ee/api/resource_state_events.html) API we should be able to build
 a tool to access the state events necessary to build a CFD from the ~workflow labels used on our Kanban board.
 
+
+## Usage
+
+No installer yet.
+
+```
+$ pipenv run python -m gl_analytics --help
+$ pipenv run python -m gl_analytics --milestone mb_v1.3 --days 30
+```
+
+
+
 ## Todos
 
 - Create installable (setup.cfg or newer toml format?)
