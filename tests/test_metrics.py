@@ -485,3 +485,13 @@ def test_filtered_label_last_label_is_skipped():
     assert all([a == b for a, b in zip(df["inprogress"].array, [0, 1, 0, 0, 0, 0])])
     assert all([a == b for a, b in zip(df["done"].array, [0, 0, 0, 0, 0, 0])])
     assert all([a == b for a, b in zip(df["closed"].array, [0, 0, 0, 0, 0, 0])])
+
+
+@pytest.mark.skip(reason="Scenario needs to be defined")
+def test_opened_and_filtered_label_shows_opened():
+    """A report should always show the opened items.
+
+    When an item is open and has a scoped label excluded from the workflow, the report should
+    include the item in the opened column.
+    """
+    assert False

@@ -24,12 +24,20 @@ class GitlabSession(Session):
         self._base_url = base_url
         self._access_token = access_token
 
-    def get(self, url):
-        if url.startswith("/"):
-            url = url[1:]
-        full_url = urljoin(self.baseurl, url)
+    def get(self, path):
+        """Calls request.get(url) appending relative path to session baseurl.
+
+        args:
+        path - path relative to base_url or absolute url starting with scheme
+
+        raises:
+        ValueError - when path starts with "/"
+        """
+        if path.startswith("/"):
+            raise ValueError
+        url = urljoin(self.baseurl, path)
         headers = {"PRIVATE-TOKEN": self._access_token}
-        return requests.get(full_url, headers=headers)
+        return requests.get(url, headers=headers)
 
     @property
     def baseurl(self):

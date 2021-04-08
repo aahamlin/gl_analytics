@@ -43,6 +43,12 @@ def test_gitlab_session_adds_access_token(session, requests_mock):
     assert requests_mock.last_request.headers["PRIVATE-TOKEN"] == "x"
 
 
+@pytest.mark.usefixtures("get_issues")
+def test_gitlab_session_requires_relative_path(session, requests_mock):
+    with pytest.raises(ValueError):
+        session.get("/groups/gozynta/issues")
+
+
 def test_issue_builds_from_dict():
 
     wfData = [

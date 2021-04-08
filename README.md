@@ -5,6 +5,12 @@ The GitLab product has an open [issue](https://gitlab.com/gitlab-org/gitlab/-/is
 Using the GitLab [resource state events](https://docs.gitlab.com/ee/api/resource_state_events.html) API we should be able to build
 a tool to access the state events necessary to build a CFD from the ~workflow labels used on our Kanban board.
 
+**Questions**
+
+- Should the reports always show every stage of the workflow (e.g. scope of label "workflow::*")?
+  Presently, you can filter out individual steps of the workflow (such as, Needs Design). Either,
+  this label should _not_ be included in the workflow scope or, if its included and filtered out,
+  the report should always count the last known step (in our case "opened")?
 
 ## Usage
 
