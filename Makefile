@@ -3,19 +3,22 @@ MODULE=gl_analytics
 
 
 all:
-	@echo "Makefile options:"
-	@echo "  init - setup pipenv"
-	@echo "  run  - run Flask app"
-	@echo "  test - run pytests"
+	@echo "Available Targets:"
+	@echo "  init\t\tsetup pipenv"
+	@echo "  test\t\trun pytests"
+	@echo "  test_e2e\texecute canned query against gitlab.com"
+	@echo ""
+	@echo "Run command line: pipenv run python -m gl_analitics --help"
 
 init:
 	pipenv install --dev
 
-run:
-	pipenv run python -m $(MODULE)
+test_e2e:
+	pipenv run python -m $(MODULE) --help
+	pipenv run python -m $(MODULE) -m mb_v1.3 -d 30
 
 test:
 	pipenv run coverage run --source=$(MODULE) -m pytest tests
 	pipenv run coverage report -m
 
-.PHONY: all init test
+.PHONY: all init test test_e2e

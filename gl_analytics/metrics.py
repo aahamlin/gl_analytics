@@ -3,6 +3,7 @@ import pandas as pd
 
 from itertools import starmap
 from collections.abc import Sequence
+from operator import itemgetter
 
 
 def daterange(start_date, end_date):
@@ -87,7 +88,9 @@ class CumulativeFlow(object):
 
         self._labels = labels
         # Cumulativeflow only records changes per day, so normalize all transition to dates
-        self._transitions = list([starmap(transition_to_date, t) for t in transitions])
+        self._transitions = list(
+            map(list, [starmap(transition_to_date, t) for t in transitions])
+        )
         self._matrix = self._build_matrix()
 
     @property
@@ -123,34 +126,65 @@ class CumulativeFlow(object):
         # datetimes will be normalized to dates for simple per day CFD
         # 'opened' is always the first transition, even if its not in the time window
         # when all transitions for an issue occur on the same day, record the last transition
+        # that is included in the desired set of labels
+        matrix = [[0 for _ in self.included_dates] for _ in self.labels]
 
-        matrix = [[0 for _ in self.included_dates] for _ in self._labels]
+        # take all transitions into account, in particular opened and closed datetimes
+        for tx_list in self._transitions:
 
-        for wf_transitions in self._transitions:
-            # takes all transitions into account, in particular opened and closed datetimes
-            transitions = [(s, t) for s, t in wf_transitions]
+            state_label = itemgetter(0)
+            opened_date = itemgetter(1)
+            ended_date = itemgetter(2)
+            state_transitions = [
+                t
+                for t in self._state_transition_generator(
+                    state_label, opened_date, tx_list
+                )
+            ]
+            filtered_states = [
+                tx for tx in state_transitions if state_label(tx) in self.labels
+            ]
 
-            tx_labels, dates = list(zip(*transitions))
-
-            opened_date = dates[0]
-
-            # Same day event: add last series label and time only
-            if all([d == opened_date for d in dates]):
-                self._add(matrix, tx_labels[-1], opened_date, datetime.date.max)
-                continue
-
-            # Multiple day events: add each series label with start and end times
-            for idx, label in enumerate(tx_labels):
-                start_date = dates[idx]
-                try:
-                    end_date = dates[idx + 1]
-                except IndexError:
-                    end_date = datetime.date.max
-
-                if label in self.labels:
-                    self._add(matrix, label, start_date, end_date)
+            if all(
+                [
+                    opened_date(elm) == opened_date(state_transitions[0])
+                    for elm in state_transitions
+                ]
+            ):
+                # find last label in our output series
+                final_state = filtered_states[-1]
+                # modify end_date for this special case
+                self._add_same_day_transitions(
+                    matrix,
+                    state_label(final_state),
+                    opened_date(final_state),
+                    ended_date(final_state),
+                )
+            else:
+                # all labels in our output series
+                for tx_state in filtered_states:
+                    self._add(matrix, *tx_state)
 
         return matrix
+
+    def _add_same_day_transitions(self, matrix, label, open_date, end_date):
+        # same day event next_date is either date.max or opened plus one
+        if end_date < datetime.date.max:
+            end_date = end_date + datetime.timedelta(1)
+        self._add(matrix, label, open_date, end_date)
+
+    def _state_transition_generator(self, state_label_, opened_date_, transitions):
+        """Generator yields a complete state transition `tuple`.
+
+        State transition: stateLabel, startDate, endDate
+        """
+        for idx, trx in enumerate(transitions):
+            try:
+                next_date = opened_date_(transitions[idx + 1])
+            except IndexError:
+                next_date = datetime.date.max
+
+            yield (state_label_(trx), opened_date_(trx), next_date)
 
     def _add(self, matrix, tx_label, start_date, end_date):
         # add transitions that are in our label collection

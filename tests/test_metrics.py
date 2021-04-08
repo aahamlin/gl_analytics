@@ -1,7 +1,6 @@
 import pytest
 import datetime
 
-# XXX date handling needs to be cleaned up
 from gl_analytics.metrics import (
     daterange,
     start_date_for_time_window,
@@ -415,55 +414,74 @@ def test_created_to_closed_same_day():
     assert all([a == b for a, b in zip(df["closed"].array, [0, 1, 1, 1, 1, 1])])
 
 
-def test_save_image():
-
+def test_filtered_label_is_skipped():
     list_of_Ts = [
         Transitions(
-            TEST_CREATED_AT,
-            None,
-            workflow_transitions=[
-                ("todo", TEST_DATETIME_LIST[0]),
-                ("inprogress", TEST_DATETIME_LIST[1]),
-                ("done", TEST_DATETIME_LIST[-1]),
-            ],
-        ),
-        Transitions(
-            TEST_CREATED_AT,
-            None,
+            TEST_DATETIME_LIST[0],
+            TEST_DATETIME_LIST[-1],
             workflow_transitions=[
                 ("todo", TEST_DATETIME_LIST[1]),
-                ("inprogress", TEST_DATETIME_LIST[3]),
+                ("inprogress", TEST_DATETIME_LIST[2]),
                 ("review", TEST_DATETIME_LIST[4]),
             ],
-        ),
+        )
     ]
+
+    series1 = ["opened", "inprogress", "done", "closed"]
 
     cf = CumulativeFlow(
         list_of_Ts,
-        labels=TEST_SERIES,
+        labels=series1,
         start_date=TEST_DATETIME_LIST[0],
         end_date=TEST_DATETIME_LIST[-1],
     )
     df = cf.get_data_frame()
     print(df.to_csv())
-    #            todo  inprogress  review  done
-    # 2021-03-15     1           0       0     0
-    # 2021-03-16     1           1       0     0
-    # 2021-03-17     1           1       0     0
-    # 2021-03-18     0           2       0     0
-    # 2021-03-19     0           1       1     0
-    # 2021-03-20     0           0       1     1
-    import os
 
-    if os.path.exists("output.png"):
-        os.remove("output.png")
+    # we did not request todo or review items from the list of available transition labels
+    with pytest.raises(KeyError):
+        df["todo"].array
+    with pytest.raises(KeyError):
+        df["review"].array
 
-    assert not os.path.exists("output.png")
+    assert all([a == b for a, b in zip(df["opened"].array, [1, 0, 0, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["inprogress"].array, [0, 0, 1, 1, 0, 0])])
+    assert all([a == b for a, b in zip(df["done"].array, [0, 0, 0, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["closed"].array, [0, 0, 0, 0, 0, 1])])
 
-    import matplotlib.pyplot as plt
 
-    plt.close("all")
-    ax = df.plot.area()
-    fig = ax.get_figure()
-    fig.savefig("output.png")
-    assert os.path.exists("output.png")
+def test_filtered_label_last_label_is_skipped():
+    list_of_Ts = [
+        Transitions(
+            TEST_DATETIME_LIST[1],
+            None,
+            workflow_transitions=[
+                ("todo", TEST_DATETIME_LIST[1]),
+                ("inprogress", TEST_DATETIME_LIST[1]),
+                ("review", TEST_DATETIME_LIST[1]),
+            ],
+        )
+    ]
+
+    # create new series without todo or review columns
+    series1 = ["opened", "inprogress", "done", "closed"]
+
+    cf = CumulativeFlow(
+        list_of_Ts,
+        labels=series1,
+        start_date=TEST_DATETIME_LIST[0],
+        end_date=TEST_DATETIME_LIST[-1],
+    )
+    df = cf.get_data_frame()
+    print(df.to_csv())
+
+    # we did not request todo or review items from the list of available transition labels
+    with pytest.raises(KeyError):
+        df["todo"].array
+    with pytest.raises(KeyError):
+        df["review"].array
+
+    assert all([a == b for a, b in zip(df["opened"].array, [0, 0, 0, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["inprogress"].array, [0, 1, 0, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["done"].array, [0, 0, 0, 0, 0, 0])])
+    assert all([a == b for a, b in zip(df["closed"].array, [0, 0, 0, 0, 0, 0])])

@@ -2,9 +2,10 @@ import pytest
 import pandas as pd
 import datetime
 
-from os import path
-
+from gl_analytics.issues import GitlabSession
 from gl_analytics.metrics import daterange
+
+from .data import TestData, to_bytes, to_link_header
 
 
 @pytest.fixture
@@ -23,6 +24,56 @@ def df():
 
 
 @pytest.fixture
-def filepath(tmp_path):
-    tmp_filepath = path.join(tmp_path, "t.csv")
+def filepath_csv(tmp_path):
+    tmp_filepath = tmp_path.joinpath("t.csv")
     return tmp_filepath
+
+
+@pytest.fixture
+def filepath_png(tmp_path):
+    tmp_filepath = tmp_path.joinpath("t.png")
+    return tmp_filepath
+
+
+@pytest.fixture
+def session():
+    session = GitlabSession("https://gitlab.com/api/v4/", access_token="x")
+    return session
+
+
+@pytest.fixture
+def get_issues(requests_mock):
+    requests_mock.get(
+        "https://gitlab.com/api/v4/groups/gozynta/issues",
+        body=to_bytes(TestData.issues.iid2.body),
+    )
+
+
+@pytest.fixture
+def get_paged_issues(requests_mock):
+    requests_mock.get(
+        "https://gitlab.com/api/v4/groups/gozynta/issues",
+        body=to_bytes(TestData.issues.iid2.body),
+        headers=to_link_header(TestData.issues.iid2.headers.link),
+    )
+
+    requests_mock.get(
+        "https://gitlab.com/api/v4/groups/gozynta/issues?id=gozynta&milestone=mb_v1.3&page=2&pagination=keyset",
+        body=to_bytes(TestData.issues.iid3.body),
+    )
+
+
+@pytest.fixture
+def get_workflow_labels(requests_mock):
+    requests_mock.get(
+        "https://gitlab.com/api/v4/projects/8273019/issues/2/resource_label_events",
+        body=to_bytes(TestData.resource_label_events[0]),
+    )
+
+
+@pytest.fixture
+def get_mixed_labels(requests_mock):
+    requests_mock.get(
+        "https://gitlab.com/api/v4/projects/8273019/issues/2/resource_label_events",
+        body=to_bytes(TestData.resource_label_events[1]),
+    )

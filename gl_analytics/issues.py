@@ -4,9 +4,8 @@ import sys
 import requests
 
 from dateutil import parser as date_parser
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urljoin
 
-GITLAB_URL_BASE = "https://gitlab.com/api/v4"
 
 
 class IssuesError(Exception):
@@ -19,12 +18,22 @@ class Session(object):
 
 
 class GitlabSession(Session):
-    def __init__(self, access_token=None):
+    def __init__(self, base_url, access_token=None):
+        if not base_url.endswith("/"):
+            base_url += "/"
+        self._base_url = base_url
         self._access_token = access_token
 
     def get(self, url):
+        if url.startswith("/"):
+            url = url[1:]
+        full_url = urljoin(self.baseurl, url)
         headers = {"PRIVATE-TOKEN": self._access_token}
-        return requests.get(url, headers=headers)
+        return requests.get(full_url, headers=headers)
+
+    @property
+    def baseurl(self):
+        return self._base_url
 
 
 class AbstractRepository(object):
@@ -74,7 +83,7 @@ class GitlabIssuesRepository(AbstractRepository):
         return [x for x in self._page_results()]
 
     def _build_request_url(self):
-        url = "{0}/groups/{1}/issues".format(GITLAB_URL_BASE, self._group)
+        url = "groups/{0}/issues".format(self._group)
         params = {"pagination": "keyset", "milestone": self._milestone}
         print("built url:", url, file=sys.stderr)
         print("built params:", params, file=sys.stderr)
@@ -138,8 +147,8 @@ class GitlabScopedLabelResolver(AbstractResolver):
 
     def _build_request_url(self, project_id, issue_id):
         # /api/v4/projects/8279995/issues/191/resource_label_events
-        url = "{0}/projects/{1}/issues/{2}/resource_label_events".format(
-            GITLAB_URL_BASE, project_id, issue_id
+        url = "projects/{0}/issues/{1}/resource_label_events".format(
+            project_id, issue_id
         )
         return url
 

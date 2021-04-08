@@ -1,10 +1,8 @@
 import datetime
-import sys
+import pytest
 
-from gl_analytics.__main__ import main, build_transitions
-from gl_analytics.issues import GITLAB_URL_BASE, Issue
-
-from .data import TestData, to_bytes
+from gl_analytics.__main__ import CONFIG, main, build_transitions
+from gl_analytics.issues import Issue
 
 
 def test_build_transitions_from_issues():
@@ -27,19 +25,29 @@ def test_build_transitions_from_issues():
     assert all([len(t) == 4 for t in transitions])  # opened, ready, in progress, done
 
 
-def test_main_prints_csv(capsys, requests_mock):
+def test_main_must_find_token(monkeypatch):
+    monkeypatch.delitem(CONFIG, "TOKEN", raising=True)
+
+    with pytest.raises(KeyError):
+        main(["-m", "mb_v1.3"])
+
+
+def test_main_must_find_base_url(monkeypatch):
+    monkeypatch.delitem(CONFIG, "GITLAB_BASE_URL", raising=True)
+
+    with pytest.raises(KeyError):
+        main(["-m", "mb_v1.3"])
+
+
+@pytest.mark.usefixtures('get_issues')
+@pytest.mark.usefixtures('get_workflow_labels')
+def test_main_prints_csv(capsys, monkeypatch):
     """Test that the main function runs without error."""
-    requests_mock.get(
-        GITLAB_URL_BASE + "/groups/gozynta/issues",
-        body=to_bytes(TestData.issues.iid2.body),
-    )
-    requests_mock.get(
-        GITLAB_URL_BASE + "/projects/8273019/issues/2/resource_label_events",
-        body=to_bytes(TestData.resource_label_events[0]),
-    )
+
+    monkeypatch.setitem(CONFIG, "TOKEN", "x")
 
     capsys.readouterr()
-    main(access_token="x", group="gozynta", milestone="mb_v1.3", file=sys.stdout)
+    main(["-m", "mb_v1.3"])
     captured = capsys.readouterr()
     assert (
         ",opened,workflow::Designing,workflow::Needs Design Approval,workflow::Ready"
