@@ -10,6 +10,7 @@ from dotenv import dotenv_values
 from .issues import GitlabSession, GitlabIssuesRepository, GitlabScopedLabelResolver
 from .metrics import Transitions, CumulativeFlow
 from .report import CsvReport
+from .config import load_config
 
 DEFAULT_SERIES = [
     "opened",
@@ -21,15 +22,7 @@ DEFAULT_SERIES = [
     "closed",
 ]
 
-CONFIG = {
-    "GITLAB_BASE_URL": "https://gitlab.com/api/v4",
-    "GITLAB_GROUP": "Gozynta",
-    **dotenv_values(".env"),
-    **os.environ,
-}
-
-
-def create_parser():
+def create_parser(config):
 
     parser = argparse.ArgumentParser(
         prog = "gl-analytics",
@@ -68,8 +61,8 @@ def create_parser():
         "--group",
         metavar="group",
         nargs="?",
-        default=CONFIG.get("GITLAB_GROUP"),
-        help="GitLab Group name, default %s"%CONFIG.get("GITLAB_GROUP")
+        default=config.get("GITLAB_GROUP"),
+        help="GitLab Group name, default %s"%config.get("GITLAB_GROUP")
     )
 
     parser.add_argument(
@@ -91,29 +84,31 @@ def build_transitions(issues):
     ]
 
 
-def main(args=None):
-    #access_token=config.get("TOKEN"), group="gozynta", milestone="mb_v1.3"
-    #access_token=None, group=None, milestone=None, days=30, file=sys.stdout
-    parser = create_parser()
-    prog_args = parser.parse_args(args)
+class Main:
 
-    token = CONFIG["TOKEN"]
-    baseurl = CONFIG["GITLAB_BASE_URL"]
+    def __init__(self, args=None):
+        self.config = load_config()
+        parser = create_parser(self.config)
+        self.prog_args = parser.parse_args(args)
 
-    session = GitlabSession(baseurl, access_token=token)
-    repository = GitlabIssuesRepository(
-        session,
-        group=prog_args.group,
-        milestone=prog_args.milestone,
-        resolvers=[GitlabScopedLabelResolver],
-    )
-    issues = repository.list()
-    # grab all the transitions from the elements in the list
-    transitions = build_transitions(issues)
-    cf = CumulativeFlow(transitions, labels=DEFAULT_SERIES, days=prog_args.days)
-    report = CsvReport(cf.get_data_frame(), file=(prog_args.outfile or sys.stdout))
-    report.export()
+    def run(self):
+        token = self.config["TOKEN"]
+        baseurl = self.config["GITLAB_BASE_URL"]
+
+        session = GitlabSession(baseurl, access_token=token)
+        repository = GitlabIssuesRepository(
+            session,
+            group=self.prog_args.group,
+            milestone=self.prog_args.milestone,
+            resolvers=[GitlabScopedLabelResolver],
+        )
+        issues = repository.list()
+        # grab all the transitions from the elements in the list
+        transitions = build_transitions(issues)
+        cf = CumulativeFlow(transitions, labels=DEFAULT_SERIES, days=self.prog_args.days)
+        report = CsvReport(cf.get_data_frame(), file=(self.prog_args.outfile or sys.stdout))
+        report.export()
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main(args=sys.argv[1:])
+    Main(args=sys.argv[1:]).run()

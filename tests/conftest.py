@@ -2,6 +2,8 @@ import pytest
 import pandas as pd
 import datetime
 
+from pathlib import Path
+
 from gl_analytics.issues import GitlabSession
 from gl_analytics.metrics import daterange
 
@@ -33,6 +35,19 @@ def filepath_csv(tmp_path):
 def filepath_png(tmp_path):
     tmp_filepath = tmp_path.joinpath("t.png")
     return tmp_filepath
+
+
+@pytest.fixture
+def filepath_dotenv(tmp_path):
+    tmp_filepath = tmp_path.joinpath(".env")
+    with tmp_filepath.open(mode="w", encoding="utf-8") as f:
+        f.write("TOKEN=test_token")
+
+    tmp_filepath.link_to(".env")
+    print(f"created tmp_filepath {tmp_filepath}")
+    link = Path(".env")
+    yield link
+    link.unlink()
 
 
 @pytest.fixture

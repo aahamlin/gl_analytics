@@ -1,11 +1,13 @@
 import datetime
 import pytest
 
-from gl_analytics.__main__ import CONFIG, main, build_transitions
+from gl_analytics.__main__ import Main
+from gl_analytics.__main__ import build_transitions
 from gl_analytics.issues import Issue
 
 
 def test_build_transitions_from_issues():
+
     created_at = datetime.datetime(2021, 3, 13, 10, tzinfo=datetime.timezone.utc)
     wfData = [
         ("ready", datetime.datetime(2021, 3, 14, 10, tzinfo=datetime.timezone.utc)),
@@ -25,29 +27,31 @@ def test_build_transitions_from_issues():
     assert all([len(t) == 4 for t in transitions])  # opened, ready, in progress, done
 
 
-def test_main_must_find_token(monkeypatch):
-    monkeypatch.delitem(CONFIG, "TOKEN", raising=True)
+def test_main_require_user_token(monkeypatch):
+    main = Main(["-m", "mb_v1.3"])
+    monkeypatch.delitem(main.config, "TOKEN", raising=False)
 
     with pytest.raises(KeyError):
-        main(["-m", "mb_v1.3"])
+        main.run()
 
 
 def test_main_must_find_base_url(monkeypatch):
-    monkeypatch.delitem(CONFIG, "GITLAB_BASE_URL", raising=True)
+    main = Main(["-m", "mb_v1.3"])
+    monkeypatch.delitem(main.config, "GITLAB_BASE_URL", raising=True)
 
     with pytest.raises(KeyError):
-        main(["-m", "mb_v1.3"])
+        main.run()
 
 
-@pytest.mark.usefixtures('get_issues')
-@pytest.mark.usefixtures('get_workflow_labels')
+@pytest.mark.usefixtures("get_issues")
+@pytest.mark.usefixtures("get_workflow_labels")
 def test_main_prints_csv(capsys, monkeypatch):
     """Test that the main function runs without error."""
-
-    monkeypatch.setitem(CONFIG, "TOKEN", "x")
+    main = Main(["-m", "mb_v1.3"])
+    monkeypatch.setitem(main.config, "TOKEN", "x")
 
     capsys.readouterr()
-    main(["-m", "mb_v1.3"])
+    main.run()
     captured = capsys.readouterr()
     assert (
         ",opened,workflow::Designing,workflow::Needs Design Approval,workflow::Ready"
