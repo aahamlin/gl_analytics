@@ -129,62 +129,62 @@ class CumulativeFlow(object):
         # that is included in the desired set of labels
         matrix = [[0 for _ in self.included_dates] for _ in self.labels]
 
-        # take all transitions into account, in particular opened and closed datetimes
-        for tx_list in self._transitions:
+        for state in self._state_transitions():
+            self._add(matrix, *state)
 
-            state_label = itemgetter(0)
-            opened_date = itemgetter(1)
-            ended_date = itemgetter(2)
+        return matrix
+
+
+    def _state_transitions(self):
+        # take all transitions into account, in particular opened and closed datetimes
+        labelgetter = itemgetter(0)
+        openedgetter = itemgetter(1)
+        endedgetter = itemgetter(2)
+
+        def _state_transition_generator(transitions):
+            """Generator yields a complete state transition `tuple`.
+
+            State transition: stateLabel, startDate, endDate
+            """
+            for idx, trx in enumerate(transitions):
+                try:
+                    next_date = openedgetter(transitions[idx + 1])
+                except IndexError:
+                    next_date = datetime.date.max
+
+                yield (labelgetter(trx), openedgetter(trx), next_date)
+
+        for states in self._transitions:
+            # list of transitions with label, start and end dates
+            # same day transitions will be merged down to last state of the day
+            # with the end date unified to either the day plus one or date.max
             state_transitions = [
                 t
-                for t in self._state_transition_generator(
-                    state_label, opened_date, tx_list
-                )
+                for t in _state_transition_generator(states)
             ]
+
             filtered_states = [
-                tx for tx in state_transitions if state_label(tx) in self.labels
+                tx for tx in state_transitions if labelgetter(tx) in self.labels
             ]
 
             if all(
                 [
-                    opened_date(elm) == opened_date(state_transitions[0])
+                    openedgetter(elm) == openedgetter(state_transitions[0])
                     for elm in state_transitions
                 ]
             ):
                 # find last label in our output series
-                final_state = filtered_states[-1]
+                label, opened, ended = filtered_states[-1]
                 # modify end_date for this special case
-                self._add_same_day_transitions(
-                    matrix,
-                    state_label(final_state),
-                    opened_date(final_state),
-                    ended_date(final_state),
-                )
+                if ended < datetime.date.max:
+                    yield label, opened, (ended+datetime.timedelta(1))
+                else:
+                    yield label, opened, ended
             else:
                 # all labels in our output series
-                for tx_state in filtered_states:
-                    self._add(matrix, *tx_state)
+                for state in filtered_states:
+                    yield state
 
-        return matrix
-
-    def _add_same_day_transitions(self, matrix, label, open_date, end_date):
-        # same day event next_date is either date.max or opened plus one
-        if end_date < datetime.date.max:
-            end_date = end_date + datetime.timedelta(1)
-        self._add(matrix, label, open_date, end_date)
-
-    def _state_transition_generator(self, state_label_, opened_date_, transitions):
-        """Generator yields a complete state transition `tuple`.
-
-        State transition: stateLabel, startDate, endDate
-        """
-        for idx, trx in enumerate(transitions):
-            try:
-                next_date = opened_date_(transitions[idx + 1])
-            except IndexError:
-                next_date = datetime.date.max
-
-            yield (state_label_(trx), opened_date_(trx), next_date)
 
     def _add(self, matrix, tx_label, start_date, end_date):
         # add transitions that are in our label collection
@@ -195,12 +195,6 @@ class CumulativeFlow(object):
             matrix[series_index][date_index] += 1
 
     def _labels_time_window(self, start, end):
-        inside_start = (
-            start if start > self.included_dates[0] else self.included_dates[0]
-        )
-        inside_end = (
-            end
-            if end <= self.included_dates[-1]
-            else (self.included_dates[-1] + datetime.timedelta(1))
-        )
+        inside_start = max(start, self.included_dates[0])
+        inside_end = min(end, (self.included_dates[-1] + datetime.timedelta(1)))
         return list(daterange(inside_start, inside_end))

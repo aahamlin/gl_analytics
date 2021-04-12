@@ -342,8 +342,6 @@ def test_step_backwards():
 
     assert len(df["todo"].array) == 6
     assert all([a == b for a, b in zip(df["todo"].array, [1, 0, 0, 0, 0, 0])])
-    # XXX This inprogress assertion fails because I have not implemented the handling of tracking
-    #     backward and forward movement through the workflow yet.
     assert all([a == b for a, b in zip(df["inprogress"].array, [0, 1, 0, 1, 0, 0])])
     assert all([a == b for a, b in zip(df["review"].array, [0, 0, 1, 0, 1, 0])])
     assert all([a == b for a, b in zip(df["done"].array, [0, 0, 0, 0, 0, 1])])
