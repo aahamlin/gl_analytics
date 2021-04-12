@@ -134,14 +134,14 @@ class CumulativeFlow(object):
 
         return matrix
 
-
     def _state_transitions(self):
         # take all transitions into account, in particular opened and closed datetimes
         labelgetter = itemgetter(0)
         openedgetter = itemgetter(1)
         endedgetter = itemgetter(2)
 
-        def _state_transition_generator(transitions):
+        # XXX the naming is kinda wonky because state and transition are reused too often.
+        def _state_generator(transitions):
             """Generator yields a complete state transition `tuple`.
 
             State transition: stateLabel, startDate, endDate
@@ -157,34 +157,31 @@ class CumulativeFlow(object):
         for states in self._transitions:
             # list of transitions with label, start and end dates
             # same day transitions will be merged down to last state of the day
-            # with the end date unified to either the day plus one or date.max
-            state_transitions = [
-                t
-                for t in _state_transition_generator(states)
-            ]
+            state_transitions = [t for t in _state_generator(states)]
 
             filtered_states = [
                 tx for tx in state_transitions if labelgetter(tx) in self.labels
             ]
 
-            if all(
+            # the last included state must span 1 day or it will not be displayed
+            last_state = filtered_states.pop()
+            if openedgetter(last_state) == endedgetter(last_state):
+                last_state = (
+                    labelgetter(last_state),
+                    openedgetter(last_state),
+                    (endedgetter(last_state) + datetime.timedelta(1)),
+                )
+
+            if not all(
                 [
                     openedgetter(elm) == openedgetter(state_transitions[0])
                     for elm in state_transitions
                 ]
             ):
-                # find last label in our output series
-                label, opened, ended = filtered_states[-1]
-                # modify end_date for this special case
-                if ended < datetime.date.max:
-                    yield label, opened, (ended+datetime.timedelta(1))
-                else:
-                    yield label, opened, ended
-            else:
-                # all labels in our output series
                 for state in filtered_states:
                     yield state
 
+            yield last_state
 
     def _add(self, matrix, tx_label, start_date, end_date):
         # add transitions that are in our label collection
