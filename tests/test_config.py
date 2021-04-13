@@ -27,9 +27,6 @@ def test_main_uses_dotenv(filepath_dotenv):
     assert config["TOKEN"] == "test_token"
 
 
-@pytest.mark.skipif(
-    Path(".env").exists(), reason="Tests must not clobber user .env file"
-)
 def test_main_uses_osenv(monkeypatch):
     """If running tests in test env there will not be a .env file.
     If there is a .env, this test is skipped.

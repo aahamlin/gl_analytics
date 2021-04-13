@@ -263,7 +263,7 @@ def test_cumulative_flow_reports_days_from_today(stages):
     assert all([a == b for a, b in zip(df["done"].array, [0, 0, 0, 0, 1])])
 
 
-def test_first_label_before_time_window(stages, datetimes):
+def test_cumulative_flow_first_label_occurs_before_time_window(stages, datetimes):
 
     tr = Transitions(
         datetimes.created_at,
@@ -332,7 +332,7 @@ def test_cumulative_flow_displays_hanging_open_closed(stages, datetimes):
     assert all([a == b for a, b in zip(df["closed"].array, [0, 0, 0, 1, 1])])
 
 
-def test_created_to_closed_same_day(stages, datetimes):
+def test_cumulative_flow_created_to_closed_same_day(stages, datetimes):
 
     tr = Transitions(
         datetimes.mar_16_2021,
@@ -363,7 +363,7 @@ def test_created_to_closed_same_day(stages, datetimes):
     assert all([a == b for a, b in zip(df["closed"].array, [0, 1, 1, 1, 1])])
 
 
-def test_filtered_labels_do_not_affect_count_of_columns(datetimes):
+def test_cumulative_flow_filtered_labels_do_not_affect_count_of_columns(datetimes):
 
     tr = Transitions(
         datetimes.start,
@@ -439,7 +439,7 @@ def test_cumulative_flow_accounts_for_filtered_stages(datetimes):
     assert all([a == b for a, b in zip(df["closed"].array, [0, 0, 0, 0, 1])])
 
 
-def test_cumulative_flow_offset_for_closed_stages(datetimes):
+def test_cumulative_flow_offsets_for_closed_stages(datetimes):
     """Closed on same day as last stage "done", but Closed is not included."""
     tr = Transitions(
         datetimes.mar_16_2021,
