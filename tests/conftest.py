@@ -10,6 +10,30 @@ from gl_analytics.metrics import daterange
 from .data import TestData, to_bytes, to_link_header
 
 
+class TestDateTimes:
+    mar_01_2021 = datetime.datetime(2021, 3, 1)
+    mar_10_2021 = datetime.datetime(2021, 3, 10)
+    mar_15_2021 = datetime.datetime(2021, 3, 15)
+    mar_16_2021 = datetime.datetime(2021, 3, 16)
+    mar_17_2021 = datetime.datetime(2021, 3, 17)
+    mar_18_2021 = datetime.datetime(2021, 3, 18)
+    mar_19_2021 = datetime.datetime(2021, 3, 19)
+    mar_20_2021 = datetime.datetime(2021, 3, 20)
+    created_at = mar_10_2021
+    start = mar_15_2021
+    end = mar_19_2021
+
+
+@pytest.fixture
+def datetimes():
+    return TestDateTimes()
+
+
+@pytest.fixture
+def stages():
+    return ["todo", "inprogress", "review", "done"]
+
+
 @pytest.fixture
 def df():
     """Return a dataframe with 5 rows and 3 columns: todo, inprogress, done."""
