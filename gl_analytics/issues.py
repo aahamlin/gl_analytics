@@ -56,11 +56,7 @@ class AbstractResolver(object):
 
 class GitlabIssuesRepository(AbstractRepository):
     """This is specifically a GitLab Issue repository. Current GitLab version is 13.11.0-pre.
-
-    If ever we needed it, an AbstractRepository could be extracted.
     """
-
-    # XXX Create a Workflow Resolver to fetch workflow states for each issue. Replaces the Gitlabissueworkflowrepository.
     def __init__(self, session, group=None, milestone=None, resolvers=[]):
         """Initialize a repository.
 
@@ -92,7 +88,10 @@ class GitlabIssuesRepository(AbstractRepository):
 
     def _build_request_url(self):
         url = "groups/{0}/issues".format(self._group)
-        params = {"pagination": "keyset", "milestone": self._milestone}
+        params = {
+            "pagination": "keyset",
+            "scope": "all",
+            "milestone": self._milestone}
         print("built url:", url, file=sys.stderr)
         print("built params:", params, file=sys.stderr)
         return "{0}?{1}".format(url, urlencode(params))
@@ -231,6 +230,7 @@ def issue_from(item):
     label_events = None
     # XXX ScopeLabelResolver added this entry to the dictionary. Find a better way
     if "_scoped_labels" in item:
+        # XXX each label event includes an end date from gitlab
         label_events = list(
             map(lambda x: (x[0], date_parser.parse(x[1])), item["_scoped_labels"])
         )

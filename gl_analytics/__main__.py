@@ -34,8 +34,8 @@ def create_parser(config):
         "--milestone",
         metavar="milestone",
         nargs="?",
-        default=None,
-        help="Milestone id, e.g. mb_v1.3"
+        default="#started",
+        help="Milestone id, e.g. mb_v1.3 or #started"
     )
 
     parser.add_argument(
@@ -77,7 +77,8 @@ def create_parser(config):
     return parser
 
 def build_transitions(issues):
-    """Create a list of transitions from a list of issues."""
+    """Create a list of transitions from a list of issues.
+    """
     return [
         Transitions(i.opened_at, i.closed_at, workflow_transitions=i.label_events)
         for i in issues

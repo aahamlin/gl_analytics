@@ -24,11 +24,12 @@ def start_date_for_time_window(end_date, days):
 
     return end_date - datetime.timedelta(days - 1)
 
-
+# XXX only used to setup the list of transition object for cumulative flow
 def transition_to_date(label, datetime):
     return label, datetime.date()
 
 
+# XXX this should include the end dates of the stages, e.g. label removed date.
 class Transitions(Sequence):
     def __init__(self, opened, closed=None, workflow_transitions=[]):
         transitions = [("opened", opened)] + workflow_transitions
@@ -141,6 +142,8 @@ class CumulativeFlow(object):
         endedgetter = itemgetter(2)
 
         # XXX the naming is kinda wonky because state and transition are reused too often.
+        # XXX this state generator should be pulled out to its own and the complete object
+        # provided to this cumulative flow object fully conforming to the desired structure.
         def _state_generator(transitions):
             """Generator yields a complete state transition `tuple`.
 
