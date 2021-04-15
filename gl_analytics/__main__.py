@@ -8,7 +8,7 @@ import sys
 from dotenv import dotenv_values
 
 from .issues import GitlabSession, GitlabIssuesRepository, GitlabScopedLabelResolver
-from .metrics import Transitions, CumulativeFlow
+from .metrics import Stages, CumulativeFlow
 from .report import CsvReport
 from .config import load_config
 
@@ -80,7 +80,7 @@ def build_transitions(issues):
     """Create a list of transitions from a list of issues.
     """
     return [
-        Transitions(i.opened_at, i.closed_at, workflow_transitions=i.label_events)
+        Stages(i.opened_at, i.closed_at, label_events=i.label_events)
         for i in issues
     ]
 
@@ -106,7 +106,7 @@ class Main:
         issues = repository.list()
         # grab all the transitions from the elements in the list
         transitions = build_transitions(issues)
-        cf = CumulativeFlow(transitions, labels=DEFAULT_SERIES, days=self.prog_args.days)
+        cf = CumulativeFlow(transitions, stages=DEFAULT_SERIES, days=self.prog_args.days)
         report = CsvReport(cf.get_data_frame(), file=(self.prog_args.outfile or sys.stdout))
         report.export()
 

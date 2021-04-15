@@ -10,12 +10,21 @@ def test_build_transitions_from_issues():
 
     created_at = datetime.datetime(2021, 3, 13, 10, tzinfo=datetime.timezone.utc)
     wfData = [
-        ("ready", datetime.datetime(2021, 3, 14, 10, tzinfo=datetime.timezone.utc)),
+        (
+            "ready",
+            datetime.datetime(2021, 3, 14, 10, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2021, 3, 15, 10, tzinfo=datetime.timezone.utc),
+        ),
         (
             "in progress",
             datetime.datetime(2021, 3, 15, 10, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2021, 3, 16, 10, tzinfo=datetime.timezone.utc)
         ),
-        ("done", datetime.datetime(2021, 3, 16, 10, tzinfo=datetime.timezone.utc)),
+        (
+            "done",
+            datetime.datetime(2021, 3, 16, 10, tzinfo=datetime.timezone.utc),
+            datetime.datetime.max
+        ),
     ]
 
     issues = [

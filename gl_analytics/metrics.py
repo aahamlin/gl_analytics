@@ -24,17 +24,33 @@ def start_date_for_time_window(end_date, days):
 
     return end_date - datetime.timedelta(days - 1)
 
-# XXX only used to setup the list of transition object for cumulative flow
-def transition_to_date(label, datetime):
-    return label, datetime.date()
+
+class Stages(Sequence):
+    """List holding all stages of a single Issue through a workflow.
+
+    Each list item is a tuple (label, start_datetime, end_datetime).
+    """
+    def __init__(self, opened, closed=None, label_events=[]):
+        # open ends at next transition start or datetime.max
+        if len(label_events)>0:
+            opened_end = label_events[0][1]
+        elif closed:
+            opened_end = closed
+        else:
+            opened_end = datetime.datetime.max
 
 
-# XXX this should include the end dates of the stages, e.g. label removed date.
-class Transitions(Sequence):
-    def __init__(self, opened, closed=None, workflow_transitions=[]):
-        transitions = [("opened", opened)] + workflow_transitions
+        transitions = [("opened", opened, opened_end)]
+
+        if len(label_events) > 0 and closed:
+            last_label_event = label_events.pop()
+            label_events.append((last_label_event[0], last_label_event[1], closed))
+
+        transitions += label_events
+
         if closed:
-            transitions += [("closed", closed)]
+            transitions += [("closed", closed, datetime.datetime.max)]
+
         self._transitions = transitions
 
     def __getitem__(self, key):
@@ -49,14 +65,26 @@ class MetricsError(Exception):
 
 
 class CumulativeFlow(object):
+
     def __init__(
         self,
-        transitions,
-        labels=["opened", "closed"],
+        stage_transitions,
+        stages=["opened", "closed"],
         days=30,
         end_date=None,
         start_date=None,
     ):
+        """Groups stages of workflow by date.
+
+        args:
+        stage_transitions list of Stages objects
+
+        kwargs:
+        stages list of stages to include in the report
+        days number of days to include in the report, default 30
+        end_date provide a specific end date, default today()
+        start_date provide a specific start date, default 30 days before end_date (inclusive)
+        """
 
         if start_date and not isinstance(start_date, datetime.date):
             raise ValueError("start_date must be datetime.date")
@@ -87,10 +115,14 @@ class CumulativeFlow(object):
                 *self._data_range_from_days(end_date, days)
             )
 
-        self._labels = labels
+        self._labels = stages
+
         # Cumulativeflow only records changes per day, so normalize all transition to dates
+        def transition_to_date(label, dt_start, dt_end):
+            return label, dt_start.date(), dt_end.date()
+
         self._transitions = list(
-            map(list, [starmap(transition_to_date, t) for t in transitions])
+            map(list, [starmap(transition_to_date, t) for t in stage_transitions])
         )
         self._matrix = self._build_matrix()
 
@@ -100,7 +132,7 @@ class CumulativeFlow(object):
         return self._included_dates
 
     @property
-    def labels(self):
+    def stages(self):
         return self._labels
 
     def get_data_frame(self):
@@ -108,7 +140,7 @@ class CumulativeFlow(object):
         # index by dates within this report's time window
         data = {k: v for k, v in zip(self._labels, self._matrix)}
         indexes = [str(d) for d in self.included_dates]
-        df = pd.DataFrame(data, index=indexes, columns=self.labels)
+        df = pd.DataFrame(data, index=indexes, columns=self.stages)
 
         return df
 
@@ -122,74 +154,59 @@ class CumulativeFlow(object):
         return (start, end)
 
     def _build_matrix(self):
-        # process self._transitions, e.g. a list of lists containing transitions of each issue
-        # each transition is a tuple, label and datetime
-        # datetimes will be normalized to dates for simple per day CFD
-        # 'opened' is always the first transition, even if its not in the time window
-        # when all transitions for an issue occur on the same day, record the last transition
-        # that is included in the desired set of labels
-        matrix = [[0 for _ in self.included_dates] for _ in self.labels]
+        """Process workflow stages for all issues e.g. a list of lists containing
+        list of transitions within a list of issues.
 
-        for state in self._state_transitions():
-            self._add(matrix, *state)
+        Each transition is a tuple, label and datetime
+        Datetimes are normalized to dates for simple per day counts
 
-        return matrix
+        'opened' is always the first transition, even if its not in the time window.
 
-    def _state_transitions(self):
-        # take all transitions into account, in particular opened and closed datetimes
+        When all transitions for an issue occur on the same day, record the last transition
+        that is included in the desired set of labels.
+        """
+
+
+        # XXX this section is still a mess :(
+        #  this should be rewritten to build up a pandas dataframe from series of our stages,
+        #  grouped by labels and ggregated by days.
+        matrix = [[0 for _ in self.included_dates] for _ in self.stages]
+
         labelgetter = itemgetter(0)
         openedgetter = itemgetter(1)
         endedgetter = itemgetter(2)
 
-        # XXX the naming is kinda wonky because state and transition are reused too often.
-        # XXX this state generator should be pulled out to its own and the complete object
-        # provided to this cumulative flow object fully conforming to the desired structure.
-        def _state_generator(transitions):
-            """Generator yields a complete state transition `tuple`.
-
-            State transition: stateLabel, startDate, endDate
-            """
-            for idx, trx in enumerate(transitions):
-                try:
-                    next_date = openedgetter(transitions[idx + 1])
-                except IndexError:
-                    next_date = datetime.date.max
-
-                yield (labelgetter(trx), openedgetter(trx), next_date)
-
-        for states in self._transitions:
-            # list of transitions with label, start and end dates
-            # same day transitions will be merged down to last state of the day
-            state_transitions = [t for t in _state_generator(states)]
-
-            filtered_states = [
-                tx for tx in state_transitions if labelgetter(tx) in self.labels
+        for issue_stages in self._transitions:
+            filtered_stages = [
+                tx for tx in issue_stages if labelgetter(tx) in self.stages
             ]
 
-            # the last included state must span 1 day or it will not be displayed
-            last_state = filtered_states.pop()
-            if openedgetter(last_state) == endedgetter(last_state):
-                last_state = (
-                    labelgetter(last_state),
-                    openedgetter(last_state),
-                    (endedgetter(last_state) + datetime.timedelta(1)),
+            last_stage = filtered_stages.pop()
+            if openedgetter(last_stage) == endedgetter(last_stage):
+                # the last included state must span 1 day or it will not be displayed
+                last_stage = (
+                    labelgetter(last_stage),
+                    openedgetter(last_stage),
+                    (endedgetter(last_stage) + datetime.timedelta(1)),
                 )
 
             if not all(
-                [
-                    openedgetter(elm) == openedgetter(state_transitions[0])
-                    for elm in state_transitions
-                ]
+                    [
+                        openedgetter(elm) == openedgetter(issue_stages[0])
+                        for elm in issue_stages
+                    ]
             ):
-                for state in filtered_states:
-                    yield state
+                for stage in filtered_stages:
+                    self._add(matrix, *stage)
 
-            yield last_state
+            self._add(matrix, *last_stage)
+
+        return matrix
 
     def _add(self, matrix, tx_label, start_date, end_date):
-        # add transitions that are in our label collection
-        series_index = self.labels.index(tx_label)
-        # loop through dates included in the time window.
+        """Add counts of stages that are within our set of stages to display and within our report time window.
+        """
+        series_index = self.stages.index(tx_label)
         for d in self._labels_time_window(start_date, end_date):
             date_index = self.included_dates.index(d)
             matrix[series_index][date_index] += 1

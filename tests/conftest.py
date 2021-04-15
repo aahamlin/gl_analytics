@@ -105,7 +105,7 @@ def get_paged_issues(requests_mock):
 def get_workflow_labels(requests_mock):
     requests_mock.get(
         "https://gitlab.com/api/v4/projects/8273019/issues/2/resource_label_events",
-        body=to_bytes(TestData.resource_label_events[0]),
+        body=to_bytes(TestData.resource_label_events.stages),
     )
 
 
@@ -113,5 +113,5 @@ def get_workflow_labels(requests_mock):
 def get_mixed_labels(requests_mock):
     requests_mock.get(
         "https://gitlab.com/api/v4/projects/8273019/issues/2/resource_label_events",
-        body=to_bytes(TestData.resource_label_events[1]),
+        body=to_bytes(TestData.resource_label_events.excluded_stages),
     )

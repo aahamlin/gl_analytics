@@ -3,10 +3,11 @@
 import sys
 import requests
 
+from datetime import datetime
 from dateutil import parser as date_parser
 from urllib.parse import urlencode, urljoin
 
-
+from .func import foldl
 
 class IssuesError(Exception):
     pass
@@ -113,8 +114,9 @@ class GitlabIssuesRepository(AbstractRepository):
             # count = len(payload)
             # print(f'processing {count} items');
             for item in payload:
-                item = self._resolve_fields(item)
-                yield issue_from(item)
+                issue = self._build_issue_from(item)
+                self._resolve_fields(issue)
+                yield issue
 
             if r1.links and "next" in r1.links:
                 # setup next page request
@@ -124,11 +126,25 @@ class GitlabIssuesRepository(AbstractRepository):
             else:
                 hasMore = False
 
-    def _resolve_fields(self, item):
+
+    def _build_issue_from(self, item):
+        # print('creating Issue from item', json.dumps(item))
+        issue_id = item["iid"]
+        project_id = item["project_id"]
+        opened_at = date_parser.parse(item["created_at"])
+        closed_at_str = item.get("closed_at")
+        closed_at = date_parser.parse(closed_at_str) if closed_at_str else None
+        label_events = None
+        issue = Issue(
+            issue_id, project_id, opened_at, closed_at=closed_at
+        )
+        return issue
+
+
+    def _resolve_fields(self, issue):
         for resolver_cls in self._resolvers:
             resolver = resolver_cls(self._session)
-            item.update(resolver.resolve(item))
-        return item
+            resolver.resolve(issue)
 
 
 class GitlabScopedLabelResolver(AbstractResolver):
@@ -145,12 +161,13 @@ class GitlabScopedLabelResolver(AbstractResolver):
         self._session = session
         self._scope = scope + "::"
 
-    def resolve(self, item):
-        url = self._build_request_url(item["project_id"], item["iid"])
+    def resolve(self, issue):
+        url = self._build_request_url(issue.project_id, issue.issue_id)
         res = self._fetch_results(url)
 
         # XXX Adding a named to a dictionary is problematic, refactor this better.
-        return {"_scoped_labels": self._find_scoped_labels(item, res)}
+        #return {"_scoped_labels": self._find_scoped_labels(item, res)}
+        issue.label_events = self._find_scoped_labels(res)
 
     def _build_request_url(self, project_id, issue_id):
         # /api/v4/projects/8279995/issues/191/resource_label_events
@@ -166,7 +183,7 @@ class GitlabScopedLabelResolver(AbstractResolver):
         payload = r.json()
         return payload
 
-    def _find_scoped_labels(self, item, payload):
+    def _find_scoped_labels(self, label_events):
         """Process transitions through workflow steps.
 
         Produces a standard record of events so that the `metrics` module can easily
@@ -189,23 +206,28 @@ class GitlabScopedLabelResolver(AbstractResolver):
           label or closing the issue).
         """
 
-        # TODO Implement the handling of label removal, resolving the limitation noted above.
-        events = []
 
-        for label_event in payload:
+        def accumulate_start_end_datetimes(acc, event):
             try:
-                action_name, step_name, action_datetime = self._get_workflow_step(
-                    label_event
-                )
-                if action_name == "add":
-                    events.append((step_name, action_datetime))
+                action, label, datetimestr = self._get_workflow_steps(event)
+                dt = date_parser.parse(datetimestr)
+
+                if action == "add":
+                    acc.append((label, dt, datetime.max))
+                elif action == "remove":
+                    for i, x in enumerate(acc):
+                        if x[0] == label and x[2] == datetime.max:
+                            acc[i] = (x[0], x[1], dt)
+                            break
+
             except TypeError:
-                # non-qualifying label event returned None
                 pass
 
-        return events
+            return acc
 
-    def _get_workflow_step(self, event):
+        return foldl(accumulate_start_end_datetimes, [], label_events)
+
+    def _get_workflow_steps(self, event):
         """Returns a tuple containing: action, step_name, date
 
         Return None for non-qualifying label events.
@@ -218,27 +240,6 @@ class GitlabScopedLabelResolver(AbstractResolver):
         action_date = event["created_at"]
 
         return action_name, step_name, action_date
-
-
-def issue_from(item):
-    # print('creating Issue from item', json.dumps(item))
-    issue_id = item["iid"]
-    project_id = item["project_id"]
-    opened_at = date_parser.parse(item["created_at"])
-    closed_at_str = item.get("closed_at")
-    closed_at = date_parser.parse(closed_at_str) if closed_at_str else None
-    label_events = None
-    # XXX ScopeLabelResolver added this entry to the dictionary. Find a better way
-    if "_scoped_labels" in item:
-        # XXX each label event includes an end date from gitlab
-        label_events = list(
-            map(lambda x: (x[0], date_parser.parse(x[1])), item["_scoped_labels"])
-        )
-
-    issue = Issue(
-        issue_id, project_id, opened_at, closed_at=closed_at, label_events=label_events
-    )
-    return issue
 
 
 class Issue(object):
@@ -275,20 +276,9 @@ class Issue(object):
     def label_events(self):
         return self._label_events
 
-    def __eq__(self, other):
-        return (
-            self.issue_id,
-            self.project_id,
-            self.opened_at,
-            self.closed_at,
-            self.label_events,
-        ) == (
-            other.issue_id,
-            other.project_id,
-            other.opened_at,
-            other.closed_at,
-            other.label_events,
-        )
+    @label_events.setter
+    def label_events(self, label_events):
+        self._label_events = label_events
 
-    def __str__(self):
+    def __str__(self): # pragma: no cover
         return f"Issue(id:{self.issue_id}, p:{self.project_id}, o:{self.opened_at}, c:{self.closed_at}, e:{self.label_events})"
