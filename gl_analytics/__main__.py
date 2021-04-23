@@ -9,7 +9,7 @@ from dotenv import dotenv_values
 
 from .issues import GitlabSession, GitlabIssuesRepository, GitlabScopedLabelResolver
 from .metrics import Stages, CumulativeFlow
-from .report import CsvReport
+from .report import CsvReport, PlotReport
 from .config import load_config
 
 DEFAULT_SERIES = [
@@ -19,7 +19,7 @@ DEFAULT_SERIES = [
     "workflow::Ready",
     "workflow::In Progress",
     "workflow::Code Review",
-    "closed",
+    # "closed",
 ]
 
 def create_parser(config):
@@ -66,12 +66,20 @@ def create_parser(config):
     )
 
     parser.add_argument(
+        "-r",
+        "--report",
+        choices=["csv", "cf"],
+        default="csv",
+        help="Specify output report type"
+    )
+
+    parser.add_argument(
         "-o",
         "--outfile",
         metavar="Filepath",
         nargs="?",
         default=None,
-        help="File to output, default stdout"
+        help="File to output or default"
     )
 
     return parser
@@ -89,8 +97,14 @@ class Main:
 
     def __init__(self, args=None):
         self.config = load_config()
+        
         parser = create_parser(self.config)
         self.prog_args = parser.parse_args(args)
+
+        self.supported_reports = {
+            'csv': CsvReport,
+            'cf': PlotReport
+        }
 
     def run(self):
         token = self.config["TOKEN"]
@@ -104,10 +118,15 @@ class Main:
             resolvers=[GitlabScopedLabelResolver],
         )
         issues = repository.list()
+
         # grab all the transitions from the elements in the list
         transitions = build_transitions(issues)
+
         cf = CumulativeFlow(transitions, stages=DEFAULT_SERIES, days=self.prog_args.days)
-        report = CsvReport(cf.get_data_frame(), file=(self.prog_args.outfile or sys.stdout))
+
+        report = self.supported_reports[self.prog_args.report](
+            cf.get_data_frame(), file=(self.prog_args.outfile or sys.stdout)  # stdout does not work for plotting
+        )
         report.export()
 
 

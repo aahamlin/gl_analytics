@@ -93,8 +93,8 @@ class GitlabIssuesRepository(AbstractRepository):
             "pagination": "keyset",
             "scope": "all",
             "milestone": self._milestone}
-        print("built url:", url, file=sys.stderr)
-        print("built params:", params, file=sys.stderr)
+        #print("built url:", url, file=sys.stderr)
+        #print("built params:", params, file=sys.stderr)
         return "{0}?{1}".format(url, urlencode(params))
 
     def _page_results(self):
@@ -122,7 +122,7 @@ class GitlabIssuesRepository(AbstractRepository):
                 # setup next page request
                 next_link = r1.links["next"]
                 url = next_link["url"]
-                print("next page:", url, file=sys.stderr)
+                #print("next page:", url, file=sys.stderr)
             else:
                 hasMore = False
 

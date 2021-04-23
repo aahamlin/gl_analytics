@@ -55,16 +55,31 @@ def test_main_must_find_base_url(monkeypatch):
 @pytest.mark.usefixtures("get_issues")
 @pytest.mark.usefixtures("get_workflow_labels")
 def test_main_prints_csv(capsys, monkeypatch):
-    """Test that the main function runs without error."""
-    main = Main(["-m", "mb_v1.3"])
+    """Test that the main function runs without error.
+    """
+    main = Main(["-m", "mb_v1.3", "-r", "csv"])
     monkeypatch.setitem(main.config, "TOKEN", "x")
 
     capsys.readouterr()
     main.run()
     captured = capsys.readouterr()
     assert (
-        ",opened,workflow::Designing,workflow::Needs Design Approval,workflow::Ready"
-        + ",workflow::In Progress,workflow::Code Review,closed"
+        ",opened,Designing,Needs Design Approval,Ready"
+        + ",In Progress,Code Review"
         in captured.out
     )
-    assert "2021-04-07,0,0,0,0,1,0,0" in captured.out
+    assert "2021-04-07,0,0,0,0,1,0" in captured.out
+
+
+@pytest.mark.usefixtures("get_issues")
+@pytest.mark.usefixtures("get_workflow_labels")
+def test_main_exports_png(monkeypatch, filepath_png):
+    """Test that the main function runs without error.
+    """
+    str_filepath = str(filepath_png.resolve())
+    print(f"export to {str_filepath}")
+    main = Main(["-m", "mb_v1.3", "-r", "cf", "-o", str_filepath])
+    monkeypatch.setitem(main.config, "TOKEN", "x")
+
+    main.run()
+    assert filepath_png.exists()

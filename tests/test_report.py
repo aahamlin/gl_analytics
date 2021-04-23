@@ -1,6 +1,6 @@
 import sys
 
-from gl_analytics.report import CsvReport
+from gl_analytics.report import CsvReport, PlotReport
 
 
 def read_filepath(fpath):
@@ -50,12 +50,6 @@ def test_csv_to_filebuf(filepath_csv, df):
 
 
 def test_save_image(filepath_png, df):
-    assert not filepath_png.exists()
-
-    import matplotlib.pyplot as plt
-
-    plt.close("all")
-    ax = df.plot.area()
-    fig = ax.get_figure()
-    fig.savefig(filepath_png.resolve())
+    report = PlotReport(df, file=filepath_png.resolve())
+    report.export()
     assert filepath_png.exists()

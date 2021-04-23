@@ -135,13 +135,23 @@ class CumulativeFlow(object):
     def stages(self):
         return self._labels
 
+    @property
+    def stripped_stages(self):
+        def strip_scope(label):
+            try:
+                return label[label.index("::")+2:]
+            except ValueError:
+                return label
+        return list(map(strip_scope, self.stages))
+
+
     def get_data_frame(self):
         """Build a DataFrame for processing (metrics, plotting, etc)."""
         # index by dates within this report's time window
         data = {k: v for k, v in zip(self._labels, self._matrix)}
-        indexes = [str(d) for d in self.included_dates]
-        df = pd.DataFrame(data, index=indexes, columns=self.stages)
-
+        indexes = pd.date_range(start=self.included_dates[0], end=self.included_dates[-1], freq="D")
+        df = pd.DataFrame(data, index=indexes)
+        df.columns = self.stripped_stages  # change columns _after_ creating DataFrame
         return df
 
     def _calculate_include_dates(self, start, end):

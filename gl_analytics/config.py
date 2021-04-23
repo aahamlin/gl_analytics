@@ -10,5 +10,4 @@ def load_config():
         **os.environ,
     }
 
-    print(f"config module loaded: {config}")
     return config
