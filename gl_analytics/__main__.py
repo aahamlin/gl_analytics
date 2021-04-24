@@ -6,10 +6,9 @@ import os
 import sys
 
 import datetime
-from dotenv import dotenv_values
 
 from .issues import GitlabSession, GitlabIssuesRepository, GitlabScopedLabelResolver
-from .metrics import Stages, CumulativeFlow
+from .metrics import IssueStageTransitions, CumulativeFlow
 from .report import CsvReport, PlotReport
 from .config import load_config
 
@@ -89,7 +88,7 @@ def build_transitions(issues):
     """Create a list of transitions from a list of issues.
     """
     return [
-        Stages(i.opened_at, i.closed_at, label_events=i.label_events)
+        IssueStageTransitions(i.opened_at, i.closed_at, label_events=i.label_events)
         for i in issues
     ]
 

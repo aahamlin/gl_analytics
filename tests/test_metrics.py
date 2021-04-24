@@ -5,7 +5,7 @@ from gl_analytics.metrics import (
     daterange,
     start_date_for_time_window,
     CumulativeFlow,
-    Stages,
+    IssueStageTransitions,
 )
 
 
@@ -79,7 +79,7 @@ def test_issue_transitions_cls_is_sequence():
         ),
     ]
 
-    actual = Stages(openedAt, None, label_events=wfData)
+    actual = IssueStageTransitions(openedAt, None, label_events=wfData)
 
     print(f"expected {expected_list} to actual {list(actual)}")
     assert expected_list == list(actual)
@@ -116,7 +116,7 @@ def test_issue_transitions_ends_last_stage_when_closed():
         ),
     ]
 
-    actual = Stages(openedAt, closed=closedAt, label_events=wfData)
+    actual = IssueStageTransitions(openedAt, closed=closedAt, label_events=wfData)
 
     print(f"expected {expected_list} to actual {list(actual)}")
     assert expected_list == list(actual)
@@ -194,7 +194,7 @@ def test_workflow_honors_end_date(datetimes, stages):
 
 def test_cumulative_flow_counts_forward(stages, datetimes):
 
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.created_at,
         None,
         label_events=[
@@ -217,7 +217,7 @@ def test_cumulative_flow_counts_forward(stages, datetimes):
 
 def test_cumulative_flow_counts_backwards(stages, datetimes):
 
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.created_at,
         None,
         label_events=[
@@ -241,7 +241,7 @@ def test_cumulative_flow_counts_backwards(stages, datetimes):
 
 def test_cumulative_flow_additive(stages, datetimes):
 
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.created_at,
         None,
         label_events=[
@@ -265,7 +265,7 @@ def test_cumulative_flow_additive(stages, datetimes):
 
 def test_cumulative_flow_counts_last_daily(stages, datetimes):
     """Test that 2 events added on same day == last occuring event of the day."""
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.created_at,
         None,
         label_events=[
@@ -297,7 +297,7 @@ def test_cumulative_flow_reports_days_from_today(stages):
     start = start_date_for_time_window(end, 5)
     recent = [d for d in daterange(start, (end + datetime.timedelta(1)))]
 
-    tr = Stages(
+    tr = IssueStageTransitions(
         start,
         None,
         label_events=[
@@ -324,7 +324,7 @@ def test_cumulative_flow_reports_days_from_today(stages):
 
 def test_cumulative_flow_first_label_occurs_before_time_window(stages, datetimes):
 
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.created_at,
         None,
         label_events=[
@@ -348,7 +348,7 @@ def test_cumulative_flow_first_label_occurs_before_time_window(stages, datetimes
 
 def test_cumulative_flow_stage_ends_when_closed(stages, datetimes):
 
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.created_at,
         datetimes.mar_19_2021,
         label_events=[
@@ -372,7 +372,7 @@ def test_cumulative_flow_stage_ends_when_closed(stages, datetimes):
 
 def test_cumulative_flow_displays_hanging_open_closed(stages, datetimes):
 
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.created_at,
         datetimes.mar_18_2021,
         label_events=[],
@@ -393,7 +393,7 @@ def test_cumulative_flow_displays_hanging_open_closed(stages, datetimes):
 
 def test_cumulative_flow_created_to_closed_same_day(stages, datetimes):
 
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.mar_16_2021,
         datetimes.mar_16_2021,
         label_events=[
@@ -424,7 +424,7 @@ def test_cumulative_flow_created_to_closed_same_day(stages, datetimes):
 
 def test_cumulative_flow_filtered_labels_do_not_affect_count_of_columns(datetimes):
 
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.start,
         datetimes.end,
         label_events=[
@@ -464,7 +464,7 @@ def test_cumulative_flow_filtered_labels_do_not_affect_count_of_columns(datetime
 
 def test_cumulative_flow_accounts_for_filtered_stages(datetimes):
 
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.created_at,
         datetimes.mar_19_2021,
         label_events=[
@@ -500,7 +500,7 @@ def test_cumulative_flow_accounts_for_filtered_stages(datetimes):
 
 def test_cumulative_flow_offsets_for_closed_stages(datetimes):
     """Closed on same day as last stage "done", but Closed is not included."""
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.mar_16_2021,
         datetimes.mar_16_2021,
         label_events=[
@@ -529,7 +529,7 @@ def test_cumulative_flow_offsets_for_filtered_stages(datetimes):
 
     Report will offset the "inprogress" date.
     """
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.mar_16_2021,
         None,
         label_events=[
@@ -558,7 +558,7 @@ def test_cumulative_flow_opened_ends_at_next_filtered_stage(datetimes):
     When an item is open and has a scoped label excluded from the workflow, the report should
     include the item in the opened column.
     """
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.created_at,
         datetimes.end,
         label_events=[
@@ -585,7 +585,7 @@ def test_cumulative_flow_accounts_for_last_day_of_report_window(stages, datetime
     """When an issue is not closed but the last stage ends on the last day of the report window."""
 
     series = ["opened"] + stages + ["closed"]
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.mar_15_2021,
         None,
         label_events=[
@@ -617,7 +617,7 @@ def test_cumulative_flow_label_removed_but_not_closed(stages, datetimes):
 
     """
     series = ["opened"] + stages + ["closed"]
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.mar_15_2021,
         None,
         label_events=[
@@ -640,7 +640,7 @@ def test_cumulative_flow_label_removed_but_not_closed(stages, datetimes):
 def test_cumulative_flow_shows_hanging_open(stages, datetimes):
     """Given an issue opened within the reporting window but never included in workflow."""
     series = ["opened"] + stages + ["closed"]
-    tr = Stages(
+    tr = IssueStageTransitions(
         datetimes.mar_15_2021,
         None,
         label_events=[],

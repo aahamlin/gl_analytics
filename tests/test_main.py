@@ -40,7 +40,7 @@ def test_build_transitions_from_issues():
 
 def test_main_require_user_token(monkeypatch):
     main = Main(["-m", "mb_v1.3"])
-    monkeypatch.delitem(main.config, "TOKEN", raising=False)
+    monkeypatch.delitem(main.config, "TOKEN")
 
     with pytest.raises(KeyError):
         main.run()

@@ -25,7 +25,7 @@ def start_date_for_time_window(end_date, days):
     return end_date - datetime.timedelta(days - 1)
 
 
-class Stages(Sequence):
+class IssueStageTransitions(Sequence):
     """List holding all stages of a single Issue through a workflow.
 
     Each list item is a tuple (label, start_datetime, end_datetime).
