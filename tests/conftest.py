@@ -49,6 +49,29 @@ def df():
 
 
 @pytest.fixture
+def fake_timestamp():
+    return datetime.datetime(2021, 4, 1)
+
+
+@pytest.fixture
+def patch_datetime_now(monkeypatch, fake_timestamp):
+    """Patch the datetime.datetime.now function.
+
+    Important note: Callers **must** match the usage exactly:
+    ```
+      import datetime
+      datetime.datetime.now()
+    ```
+    """
+    class mydatetime:
+        @classmethod
+        def now(cls, *args, **kwargs):
+            return fake_timestamp
+
+    monkeypatch.setattr(datetime, 'datetime', mydatetime)
+
+
+@pytest.fixture
 def filepath_csv(tmp_path):
     tmp_filepath = tmp_path.joinpath("t.csv")
     return tmp_filepath

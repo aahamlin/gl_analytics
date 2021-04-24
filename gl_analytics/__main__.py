@@ -5,6 +5,7 @@ import argparse
 import os
 import sys
 
+import datetime
 from dotenv import dotenv_values
 
 from .issues import GitlabSession, GitlabIssuesRepository, GitlabScopedLabelResolver
@@ -97,18 +98,21 @@ class Main:
 
     def __init__(self, args=None):
         self.config = load_config()
-        
+
         parser = create_parser(self.config)
         self.prog_args = parser.parse_args(args)
 
+        timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.supported_reports = {
-            'csv': CsvReport,
-            'cf': PlotReport
+            'csv': (CsvReport, sys.stdout),
+            'cf': (PlotReport, f"cfd_{timestamp_str}.png"),
         }
 
     def run(self):
         token = self.config["TOKEN"]
         baseurl = self.config["GITLAB_BASE_URL"]
+        outfile = self.prog_args.outfile
+        days = self.prog_args.days
 
         session = GitlabSession(baseurl, access_token=token)
         repository = GitlabIssuesRepository(
@@ -122,13 +126,15 @@ class Main:
         # grab all the transitions from the elements in the list
         transitions = build_transitions(issues)
 
-        cf = CumulativeFlow(transitions, stages=DEFAULT_SERIES, days=self.prog_args.days)
+        cf = CumulativeFlow(transitions, stages=DEFAULT_SERIES, days=days)
 
-        report = self.supported_reports[self.prog_args.report](
-            cf.get_data_frame(), file=(self.prog_args.outfile or sys.stdout)  # stdout does not work for plotting
+        report_cls, default_file = self.supported_reports[self.prog_args.report]
+        report = report_cls(
+            cf.get_data_frame(), file=(outfile or default_file)
         )
         report.export()
-
+        if outfile:
+            print(f"Created '{outfile}'.")
 
 if __name__ == "__main__":  # pragma: no cover
     Main(args=sys.argv[1:]).run()

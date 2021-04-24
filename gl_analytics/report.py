@@ -45,6 +45,11 @@ class PlotReport:
 
     def export(self):
         plt.close("all")
-        ax = self._df.plot.area()
+        ax = self._df.plot.area(
+            title="Cumulative Flow",  # XXX generate title from query filter & datetimes
+            legend="reverse",
+            ylabel="Count of issues",
+            xlabel="Days"
+        )
         fig = ax.get_figure()
         fig.savefig(self._file)

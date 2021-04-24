@@ -1,18 +1,7 @@
 import sys
 
 from gl_analytics.report import CsvReport, PlotReport
-
-
-def read_filepath(fpath):
-    content = ""
-    with open(fpath, mode="r", newline="", encoding="utf-8") as fbuf:
-        while True:
-            chunk = fbuf.read(2048)
-            if not chunk:
-                break
-            content += chunk
-
-    return content
+from tests import read_filepath
 
 
 def test_csv_return_string(df):
