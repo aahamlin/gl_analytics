@@ -14,12 +14,10 @@ from .config import load_config
 
 DEFAULT_SERIES = [
     "opened",
-    "workflow::Designing",
-    "workflow::Needs Design Approval",
-    "workflow::Ready",
-    "workflow::In Progress",
-    "workflow::Code Review",
-    # "closed",
+    "Ready",
+    "In Progress",
+    "Code Review",
+    "closed",
 ]
 
 def create_parser(config):

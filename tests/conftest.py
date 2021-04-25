@@ -2,29 +2,9 @@ import pytest
 import pandas as pd
 import datetime
 
-from types import SimpleNamespace
-
 from gl_analytics.issues import GitlabSession
-from gl_analytics.metrics import daterange
 
 from .data import TestData, to_bytes, to_link_header
-
-
-@pytest.fixture
-def datetimes():
-    return SimpleNamespace(
-        mar_01_2021=datetime.datetime(2021, 3, 1),
-        mar_10_2021=datetime.datetime(2021, 3, 10),
-        mar_15_2021=datetime.datetime(2021, 3, 15),
-        mar_16_2021=datetime.datetime(2021, 3, 16),
-        mar_17_2021=datetime.datetime(2021, 3, 17),
-        mar_18_2021=datetime.datetime(2021, 3, 18),
-        mar_19_2021=datetime.datetime(2021, 3, 19),
-        mar_20_2021=datetime.datetime(2021, 3, 20),
-        created_at=datetime.datetime(2021, 3, 10),
-        start=datetime.datetime(2021, 3, 15),
-        end=datetime.datetime(2021, 3, 19),
-    )
 
 
 @pytest.fixture
@@ -35,21 +15,22 @@ def stages():
 @pytest.fixture
 def df():
     """Return a dataframe with 5 rows and 3 columns: todo, inprogress, done."""
-    dates = [
-        d for d in daterange(datetime.date(2021, 3, 15), datetime.date(2021, 3, 20))
-    ]
     data = {
         "todo": [3, 2, 1, 0, 0],
         "inprogress": [0, 1, 2, 3, 1],
         "done": [0, 0, 0, 1, 2],
     }
-    df = pd.DataFrame(data, index=dates, columns=data.keys())
+    df = pd.DataFrame(data, index=pd.date_range(
+        start="2021-03-15", end="2021-03-19", freq="D", name="datetime", tz="UTC"
+    ), columns=data.keys())
     return df
 
 
 @pytest.fixture
 def fake_timestamp():
-    return datetime.datetime(2021, 4, 1)
+    """ 2021 Apr 1, 12:00 AM
+    """
+    return datetime.datetime(2021, 4, 1, tzinfo=datetime.timezone.utc)
 
 
 @pytest.fixture

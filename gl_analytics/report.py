@@ -24,7 +24,10 @@ class CsvReport:
 
         Todo: pass arguments directly to dataframe to_csv function.
         """
-        return self._df.to_csv(self._file)
+        return self._df.to_csv(
+            self._file,
+            date_format="%Y-%m-%d"
+        )
 
 
 class PlotReport:

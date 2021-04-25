@@ -213,10 +213,10 @@ class GitlabScopedLabelResolver(AbstractResolver):
                 dt = date_parser.parse(datetimestr)
 
                 if action == "add":
-                    acc.append((label, dt, datetime.max))
+                    acc.append((label, dt, None))
                 elif action == "remove":
                     for i, x in enumerate(acc):
-                        if x[0] == label and x[2] == datetime.max:
+                        if x[0] == label and x[2] is None:
                             acc[i] = (x[0], x[1], dt)
                             break
 
@@ -235,7 +235,7 @@ class GitlabScopedLabelResolver(AbstractResolver):
         if not event["label"]["name"].startswith(self._scope):
             return None
 
-        step_name = event["label"]["name"]
+        step_name = event["label"]["name"].lstrip(self._scope)
         action_name = event["action"]
         action_date = event["created_at"]
 

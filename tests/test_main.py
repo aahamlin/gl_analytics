@@ -1,6 +1,9 @@
 import datetime
 import pytest
 
+import numpy as np
+import pandas as pd
+
 from tests import change_directory, read_filepath
 
 from gl_analytics.__main__ import Main
@@ -25,7 +28,7 @@ def test_build_transitions_from_issues():
         (
             "done",
             datetime.datetime(2021, 3, 16, 10, tzinfo=datetime.timezone.utc),
-            datetime.datetime.max
+            None
         ),
     ]
 
@@ -34,8 +37,24 @@ def test_build_transitions_from_issues():
         Issue(2, 2, created_at, label_events=wfData),
     ]
     transitions = build_transitions(issues)
+    expected = pd.DataFrame(
+        {
+            "opened": [1, 0, np.nan, np.nan],
+            "ready": [np.nan, 1, 0, np.nan],
+            "in progress": [np.nan, np.nan, 1, 0],
+            "done": [np.nan, np.nan, np.nan, 1]
+        },
+        index=[
+            created_at,
+            datetime.datetime(2021, 3, 14, 10, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2021, 3, 15, 10, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2021, 3, 16, 10, tzinfo=datetime.timezone.utc),
+        ]
+    )
+    print(expected)
     assert len(transitions) == 2
-    assert all([len(t) == 4 for t in transitions])  # opened, ready, in progress, done
+    print([t.data for t in transitions])
+    assert all([expected.equals(t.data) for t in transitions])
 
 
 def test_main_require_user_token(monkeypatch):
@@ -56,7 +75,7 @@ def test_main_must_find_base_url(monkeypatch):
 
 @pytest.mark.usefixtures("get_issues")
 @pytest.mark.usefixtures("get_workflow_labels")
-def test_main_prints_csv(capsys, monkeypatch):
+def test_main_prints_csv(capsys, monkeypatch, patch_datetime_now):
     """Test that the main function runs without error.
     """
     main = Main(["-m", "mb_v1.3", "-r", "csv"])
@@ -65,17 +84,17 @@ def test_main_prints_csv(capsys, monkeypatch):
     capsys.readouterr()
     main.run()
     captured = capsys.readouterr()
+    print("\noutput captured\n", captured.out)
     assert (
-        ",opened,Designing,Needs Design Approval,Ready"
-        + ",In Progress,Code Review"
+        ",opened,Ready,In Progress,Code Review,closed"
         in captured.out
     )
-    assert "2021-04-07,0,0,0,0,1,0" in captured.out
+    assert "2021-03-07,0.0,0.0,1.0,0.0,0.0" in captured.out
 
 
 @pytest.mark.usefixtures("get_issues")
 @pytest.mark.usefixtures("get_workflow_labels")
-def test_main_writes_csv(filepath_csv, monkeypatch):
+def test_main_writes_csv(filepath_csv, monkeypatch, patch_datetime_now):
     """Test that the main function runs without error.
     """
     str_filepath = str(filepath_csv.resolve())
@@ -85,11 +104,10 @@ def test_main_writes_csv(filepath_csv, monkeypatch):
     main.run()
     content = read_filepath(filepath_csv)
     assert (
-        ",opened,Designing,Needs Design Approval,Ready"
-        + ",In Progress,Code Review"
+        ",opened,Ready,In Progress,Code Review,closed"
         in content
     )
-    assert "2021-04-07,0,0,0,0,1,0" in content
+    assert "2021-03-07,0.0,0.0,1.0,0.0,0.0" in content
 
 
 @pytest.mark.usefixtures("get_issues")

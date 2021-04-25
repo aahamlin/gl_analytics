@@ -1,63 +1,71 @@
 import datetime
 import pandas as pd
+import numpy as np
 
 from itertools import starmap
 from collections.abc import Sequence
 from operator import itemgetter
 
+from .func import foldl
 
-def daterange(start_date, end_date):
-    """Generate dates from start to end, exclusive.
 
-    Given start=3-15, end=3-20, generator will generate dates from 3-15..3-19.
+class IssueStageTransitions:
+    """Creates a DataFrame holding all stages of a single Issue through a workflow.
+
+    Each row is indexed by "datetime".
     """
-    for n in range(int((end_date - start_date).days)):
-        yield start_date + datetime.timedelta(n)
 
-
-def start_date_for_time_window(end_date, days):
-    """Return starting date of a time window including given end_date.
-    For example, 5 day window from 2021-3-15 to 2021-3-19 (M-F)
-    """
-    if days < 1:
-        raise ValueError()
-
-    return end_date - datetime.timedelta(days - 1)
-
-
-class IssueStageTransitions(Sequence):
-    """List holding all stages of a single Issue through a workflow.
-
-    Each list item is a tuple (label, start_datetime, end_datetime).
-    """
     def __init__(self, opened, closed=None, label_events=[]):
+
+        # XXX This could definitely be cleaned up by constructing the list of dicts more directly
+
+        index_name = "datetime"
+
         # open ends at next transition start or datetime.max
-        if len(label_events)>0:
+        if len(label_events) > 0:
             opened_end = label_events[0][1]
         elif closed:
             opened_end = closed
         else:
-            opened_end = datetime.datetime.max
+            opened_end = None
 
+        def to_record(label, start, end):
+            yield dict(zip([index_name, label], [start, 1]))
 
-        transitions = [("opened", opened, opened_end)]
+            if end:
+                yield dict(zip([index_name, label], [end, 0]))
+
+        transitions = []
+
+        transitions.extend(to_record("opened", opened, opened_end))
 
         if len(label_events) > 0 and closed:
             last_label_event = label_events.pop()
             label_events.append((last_label_event[0], last_label_event[1], closed))
 
-        transitions += label_events
+        for event in label_events:
+            transitions.extend(to_record(*event))
 
         if closed:
-            transitions += [("closed", closed, datetime.datetime.max)]
+            transitions.extend(to_record("closed", closed, None))
 
-        self._transitions = transitions
+        records = {}
+        for t in transitions:
+            dt = t[index_name]
+            if dt not in records:
+                records[dt] = {}
+            records[dt].update(t)
 
-    def __getitem__(self, key):
-        return self._transitions.__getitem__(key)
+        # from_records requires a list
+        values = list(records.values())
+        self._transitions = pd.DataFrame.from_records(values, index=[index_name])
 
-    def __len__(self):
-        return self._transitions.__len__()
+    @property
+    def data(self):
+        return self._transitions
+
+    def __str__(self):
+        return str(self._transitions)
 
 
 class MetricsError(Exception):
@@ -65,10 +73,9 @@ class MetricsError(Exception):
 
 
 class CumulativeFlow(object):
-
     def __init__(
         self,
-        stage_transitions,
+        issues_stage_transitions,
         stages=["opened", "closed"],
         days=30,
         end_date=None,
@@ -101,127 +108,81 @@ class CumulativeFlow(object):
         if hasattr(end_date, "date"):
             end_date = end_date.date()
 
-        if isinstance(end_date, datetime.date) and isinstance(
-            start_date, datetime.date
-        ):
-            self._included_dates = self._calculate_include_dates(start_date, end_date)
+        # XXX could use partial application to make this cleaner?
+        if end_date and start_date:
+            self._index_daterange = pd.date_range(
+                start=start_date, end=end_date, freq="D", name="datetime", tz="UTC"
+            )
+        elif start_date:
+            self._index_daterange = pd.date_range(
+                start=start_date, periods=days, freq="D", name="datetime", tz="UTC"
+            )
         else:
             end_date = (
                 end_date
                 if end_date
                 else datetime.datetime.now(tz=datetime.timezone.utc).date()
             )
-            self._included_dates = self._calculate_include_dates(
-                *self._data_range_from_days(end_date, days)
+            self._index_daterange = pd.date_range(
+                end=end_date, periods=days, freq="D", name="datetime", tz="UTC"
             )
 
         self._labels = stages
 
-        # Cumulativeflow only records changes per day, so normalize all transition to dates
-        def transition_to_date(label, dt_start, dt_end):
-            return label, dt_start.date(), dt_end.date()
+        def dt_index_shift(r):
+            """If last row sum == 0 return index of row to move else None
+            """
+            return (
+                r.iloc[-1].name
+                if not r.dropna().empty and 0 == r.iloc[-1].sum()
+                else None
+            )
 
-        self._transitions = list(
-            map(list, [starmap(transition_to_date, t) for t in stage_transitions])
+        def combine(d1, d2):
+            d2 = d2.reindex(columns=d1.columns)
+            shift_dt_index = d2.groupby(pd.Grouper(freq="1D")).apply(dt_index_shift)
+            dt_to_shift = [dt for dt in shift_dt_index if dt is not pd.NaT]
+            for dt in dt_to_shift:
+                # use numpy datetime64 object to sort these "raw" indices
+                dt64 = dt.to_numpy()
+                new_index_dt64 = (dt.normalize() + pd.Timedelta("1D")).to_numpy()
+                old_indices_dt64 = np.where(d2.index.values == dt64)[0]
+                for old_index in old_indices_dt64:
+                    d2.index.values[old_index] = new_index_dt64
+
+            d2 = d2.resample("1D").last()
+            d2 = d2.fillna(method="ffill")
+            d2 = d2.reindex(d1.index, method="ffill")
+            return d1.combine(d2, np.add, fill_value=0)
+
+        cats = pd.Series(
+            pd.Categorical(self._labels, categories=self._labels, ordered=True)
         )
-        self._matrix = self._build_matrix()
+
+        df = pd.DataFrame([], index=self._index_daterange, columns=cats)
+        self._data = foldl(combine, df, [a.data for a in issues_stage_transitions])
 
     @property
     def included_dates(self):
         """The dates included in this report."""
-        return self._included_dates
+        # return self._included_dates
+        return self._index_daterange
 
     @property
     def stages(self):
         return self._labels
 
-    @property
-    def stripped_stages(self):
-        def strip_scope(label):
-            try:
-                return label[label.index("::")+2:]
-            except ValueError:
-                return label
-        return list(map(strip_scope, self.stages))
+    # @property
+    # def stripped_stages(self):
+    #     def strip_scope(label):
+    #         try:
+    #             return label[label.index("::") + 2 :]
+    #         except ValueError:
+    #             return label
 
+    #     return list(map(strip_scope, self.stages))
 
     def get_data_frame(self):
-        """Build a DataFrame for processing (metrics, plotting, etc)."""
-        # index by dates within this report's time window
-        data = {k: v for k, v in zip(self._labels, self._matrix)}
-        indexes = pd.date_range(start=self.included_dates[0], end=self.included_dates[-1], freq="D")
-        df = pd.DataFrame(data, index=indexes)
-        df.columns = self.stripped_stages  # change columns _after_ creating DataFrame
-        return df
-
-    def _calculate_include_dates(self, start, end):
-        # add 1 day because generator excludes end, as matches Python generators expectations
-        end = end + datetime.timedelta(1)
-        return list(daterange(start, end))
-
-    def _data_range_from_days(self, end, days):
-        start = start_date_for_time_window(end, days)
-        return (start, end)
-
-    def _build_matrix(self):
-        """Process workflow stages for all issues e.g. a list of lists containing
-        list of transitions within a list of issues.
-
-        Each transition is a tuple, label and datetime
-        Datetimes are normalized to dates for simple per day counts
-
-        'opened' is always the first transition, even if its not in the time window.
-
-        When all transitions for an issue occur on the same day, record the last transition
-        that is included in the desired set of labels.
+        """Build a DataFrame for processing (metrics, plotting, etc).
         """
-
-
-        # XXX this section is still a mess :(
-        #  this should be rewritten to build up a pandas dataframe from series of our stages,
-        #  grouped by labels and ggregated by days.
-        matrix = [[0 for _ in self.included_dates] for _ in self.stages]
-
-        labelgetter = itemgetter(0)
-        openedgetter = itemgetter(1)
-        endedgetter = itemgetter(2)
-
-        for issue_stages in self._transitions:
-            filtered_stages = [
-                tx for tx in issue_stages if labelgetter(tx) in self.stages
-            ]
-
-            last_stage = filtered_stages.pop()
-            if openedgetter(last_stage) == endedgetter(last_stage):
-                # the last included state must span 1 day or it will not be displayed
-                last_stage = (
-                    labelgetter(last_stage),
-                    openedgetter(last_stage),
-                    (endedgetter(last_stage) + datetime.timedelta(1)),
-                )
-
-            if not all(
-                    [
-                        openedgetter(elm) == openedgetter(issue_stages[0])
-                        for elm in issue_stages
-                    ]
-            ):
-                for stage in filtered_stages:
-                    self._add(matrix, *stage)
-
-            self._add(matrix, *last_stage)
-
-        return matrix
-
-    def _add(self, matrix, tx_label, start_date, end_date):
-        """Add counts of stages that are within our set of stages to display and within our report time window.
-        """
-        series_index = self.stages.index(tx_label)
-        for d in self._labels_time_window(start_date, end_date):
-            date_index = self.included_dates.index(d)
-            matrix[series_index][date_index] += 1
-
-    def _labels_time_window(self, start, end):
-        inside_start = max(start, self.included_dates[0])
-        inside_end = min(end, (self.included_dates[-1] + datetime.timedelta(1)))
-        return list(daterange(inside_start, inside_end))
+        return self._data
