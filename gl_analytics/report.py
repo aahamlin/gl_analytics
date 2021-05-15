@@ -7,7 +7,7 @@ class CsvReport:
     """Configure the output of a DataFrame csv format.
     """
 
-    def __init__(self, df, file=None):
+    def __init__(self, df, file=None, **kwargs):
         """Prepare a CSV report format file.
 
         This is no more than a convenience wrapper to Pandas DataFrame API.
@@ -34,7 +34,7 @@ class PlotReport:
     """Configure the output of a DataFrame to plot image (.png).
     """
 
-    def __init__(self, df, file=None):
+    def __init__(self, df, file=None, **kwargs):
         """Prepare a plot file.
 
         This is no more than a convenience wrapper to Pandas DataFrame API.
@@ -42,16 +42,23 @@ class PlotReport:
         Arguments:
         df - DataFrame (required)
         file - Write to given file path or open file buffer. Returns a string when None.
+        title - Extra title, typically represents the search criteria, e.g. milestone name
         """
         self._df = df
         self._file = file
+        self.title = " ".join([
+            "CFD",
+            kwargs.get("title", ""),
+            str(df.index.date[0]),
+            str(df.index.date[-1])
+        ])
 
     def export(self):
         plt.close("all")
         ax = self._df.plot.area(
-            title="Cumulative Flow",  # XXX generate title from query filter & datetimes
+            title=self.title,
             legend="reverse",
-            ylabel="Count of issues",
+            ylabel="Count of Issues",
             xlabel="Days"
         )
         fig = ax.get_figure()

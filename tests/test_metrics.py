@@ -12,25 +12,6 @@ from gl_analytics.metrics import (
 )
 
 
-# XXX replace this with another function from pandas
-def daterange(start_date, end_date):
-    """Generate dates from start to end, exclusive.
-
-    Given start=3-15, end=3-20, generator will generate dates from 3-15..3-19.
-    """
-    for n in range(int((end_date - start_date).days)):
-        yield start_date + datetime.timedelta(n)
-
-
-def test_daterange_exclusive():
-    """Make sure the daterange generator works until we replace it.
-    """
-    d1 = datetime.date(2021, 3, 15)
-    d2 = datetime.date(2021, 3, 20)
-    dates = [d for d in daterange(d1, d2)]
-    assert dates[-1] == datetime.date(2021, 3, 19)
-
-
 def test_issue_stage_transitions_should_be_records():
 
     wfData = [
@@ -67,29 +48,73 @@ def test_issue_stage_transitions_should_be_records():
     assert expected.equals(actual.data)
 
 
-def test_issue_transitions_ends_last_stage_when_closed():
+def test_issue_transitions_should_end_labels_when_closed():
+    openedAt = datetime.datetime(2021, 3, 14, 12, tzinfo=datetime.timezone.utc)
+    closedAt = datetime.datetime(2021, 3, 18, tzinfo=datetime.timezone.utc)
 
     wfData = [
         (
+            "todo",
+            openedAt + datetime.timedelta(days=1),
+            openedAt + datetime.timedelta(days=2)
+        ),
+        (
             "done",
-            datetime.datetime(2021, 3, 16, 10, tzinfo=datetime.timezone.utc),
+            openedAt + datetime.timedelta(days=2),
             None,
         ),
     ]
 
+    expected_data = [
+        {"datetime": openedAt, "opened": 1},
+        {"datetime": openedAt + datetime.timedelta(days=1), "opened": 0, "todo": 1},
+        {"datetime": openedAt + datetime.timedelta(days=2), "todo": 0, "done": 1},
+        {"datetime": closedAt, "done": 0, "closed": 1},
+    ]
+
+    expected = pd.DataFrame.from_records(expected_data, index=["datetime"])
+    actual = IssueStageTransitions(openedAt, closed=closedAt, label_events=wfData)
+    assert expected.equals(actual.data)
+
+
+def test_issue_transitions_should_end_open_when_closed():
     openedAt = datetime.datetime(2021, 3, 14, 12, tzinfo=datetime.timezone.utc)
     closedAt = datetime.datetime(2021, 3, 18, tzinfo=datetime.timezone.utc)
 
     expected_data = [
         {"datetime": openedAt, "opened": 1},
-        {"datetime": datetime.datetime(2021, 3, 16, 10, tzinfo=datetime.timezone.utc), "opened": 0, "done": 1},
-        {"datetime": datetime.datetime(2021, 3, 18, tzinfo=datetime.timezone.utc), "done": 0, "closed": 1},
+        {"datetime": closedAt, "opened": 0, "closed": 1},
     ]
 
     expected = pd.DataFrame.from_records(expected_data, index=["datetime"])
-
-    actual = IssueStageTransitions(openedAt, closed=closedAt, label_events=wfData)
+    actual = IssueStageTransitions(openedAt, closed=closedAt, label_events=[])
     assert expected.equals(actual.data)
+
+
+def test_issue_transitions_should_open_indefinitely():
+    openedAt = datetime.datetime(2021, 3, 14, 12, tzinfo=datetime.timezone.utc)
+
+    expected_data = [
+        {"datetime": openedAt, "opened": 1},
+    ]
+
+    expected = pd.DataFrame.from_records(expected_data, index=["datetime"])
+    actual = IssueStageTransitions(openedAt, label_events=[])
+    assert expected.equals(actual.data)
+
+
+def test_issue_transitions_should_provide_str():
+    openedAt = datetime.datetime(2021, 3, 14, 12, tzinfo=datetime.timezone.utc)
+    closedAt = datetime.datetime(2021, 3, 18, tzinfo=datetime.timezone.utc)
+
+    expected_data = [
+        {"datetime": openedAt, "opened": 1},
+        {"datetime": closedAt, "opened": 0, "closed": 1},
+    ]
+
+    expected = pd.DataFrame.from_records(expected_data, index=["datetime"])
+    actual = IssueStageTransitions(openedAt, closed=closedAt, label_events=[])
+    assert str(expected) == str(actual)
 
 
 def test_workflow_requires_date_object_for_start(stages):
@@ -133,8 +158,7 @@ def test_workflow_honors_today_with_days(stages, fake_timestamp, patch_datetime_
     assert values[-1] == pd.to_datetime(fake_timestamp).to_datetime64()
 
 
-def test_workflow_honors_end_date_default_days(stages):
-    # default 30 days
+def test_cumulative_flow_should_default_30days(stages):
     cf = CumulativeFlow([], stages=stages, end_date=datetime.date(2021, 3, 30))
     assert cf.included_dates.size == 30
     values = cf.included_dates.values
@@ -142,26 +166,16 @@ def test_workflow_honors_end_date_default_days(stages):
     assert values[0] == np.datetime64(datetime.date(2021, 3, 1))
 
 
-def test_workflow_honors_start_date(stages):
-    report_daterange = [d for d in daterange(datetime.datetime(2021, 3, 15), datetime.datetime(2021, 3, 19))]
+def test_cumulative_flow_should_generate_date_range(stages):
     cf = CumulativeFlow(
         [],
         stages=stages,
-        start_date=report_daterange[0],
-        end_date=report_daterange[-1],
+        start_date=datetime.date(2021, 3, 15),
+        end_date=datetime.date(2021, 3, 19),
     )
-    assert cf.included_dates[0] == report_daterange[0].date()
-
-
-def test_workflow_honors_end_date(stages):
-    report_daterange = [d for d in daterange(datetime.datetime(2021, 3, 15), datetime.datetime(2021, 3, 19))]
-    cf = CumulativeFlow(
-        [],
-        stages=stages,
-        start_date=report_daterange[0],
-        end_date=report_daterange[-1],
-    )
-    assert cf.included_dates[-1] == report_daterange[-1].date()
+    assert cf.included_dates[0] == datetime.date(2021, 3, 15)
+    assert cf.included_dates[-1] == datetime.date(2021, 3, 19)
+    assert cf.included_dates.size == 5
 
 
 def test_cumulative_flow_counts_forward(stages):

@@ -117,7 +117,7 @@ def test_main_exports_png(monkeypatch, filepath_png):
     """
     str_filepath = str(filepath_png.resolve())
     print(f"export to {str_filepath}")
-    main = Main(["-m", "mb_v1.3", "-r", "cf", "-o", str_filepath])
+    main = Main(["-m", "mb_v1.3", "-r", "plot", "-o", str_filepath])
     monkeypatch.setitem(main.config, "TOKEN", "x")
 
     main.run()
@@ -130,9 +130,8 @@ def test_main_exports_png(monkeypatch, filepath_png):
 def test_main_exports_default_png(monkeypatch, tmp_path, fake_timestamp):
     """Test that the main function runs without error.
     """
-    # change dir to temp path
     with change_directory(tmp_path):
-        main = Main(["-m", "mb_v1.3", "-r", "cf"])
+        main = Main(["-m", "mb_v1.3", "-r", "plot"])
         monkeypatch.setitem(main.config, "TOKEN", "x")
         main.run()
 

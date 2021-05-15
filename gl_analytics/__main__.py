@@ -66,7 +66,7 @@ def create_parser(config):
     parser.add_argument(
         "-r",
         "--report",
-        choices=["csv", "cf"],
+        choices=["csv", "plot"],
         default="csv",
         help="Specify output report type"
     )
@@ -102,7 +102,7 @@ class Main:
         timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.supported_reports = {
             'csv': (CsvReport, sys.stdout),
-            'cf': (PlotReport, f"cfd_{timestamp_str}.png"),
+            'plot': (PlotReport, f"cfd_{timestamp_str}.png"),
         }
 
     def run(self):
@@ -127,7 +127,9 @@ class Main:
 
         report_cls, default_file = self.supported_reports[self.prog_args.report]
         report = report_cls(
-            cf.get_data_frame(), file=(outfile or default_file)
+            cf.get_data_frame(),
+            file=(outfile or default_file),
+            title=self.prog_args.milestone
         )
         report.export()
         if outfile:

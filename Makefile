@@ -15,7 +15,7 @@ init:
 
 test_e2e:
 	pipenv run python -m $(MODULE) --help
-	pipenv run python -m $(MODULE) -m mb_v1.3 -d 30
+	pipenv run python -m $(MODULE)
 
 test:
 	PIPENV_DONT_LOAD_ENV=1 pipenv run coverage run --source=$(MODULE) -m pytest tests

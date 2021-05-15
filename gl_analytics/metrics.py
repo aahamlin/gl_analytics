@@ -168,20 +168,6 @@ class CumulativeFlow(object):
         # return self._included_dates
         return self._index_daterange
 
-    @property
-    def stages(self):
-        return self._labels
-
-    # @property
-    # def stripped_stages(self):
-    #     def strip_scope(label):
-    #         try:
-    #             return label[label.index("::") + 2 :]
-    #         except ValueError:
-    #             return label
-
-    #     return list(map(strip_scope, self.stages))
-
     def get_data_frame(self):
         """Build a DataFrame for processing (metrics, plotting, etc).
         """
