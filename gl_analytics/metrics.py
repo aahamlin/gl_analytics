@@ -4,6 +4,7 @@ import numpy as np
 
 from itertools import starmap
 from collections.abc import Sequence
+from functools import partial
 from operator import itemgetter
 
 from .func import foldl
@@ -68,10 +69,6 @@ class IssueStageTransitions:
         return str(self._transitions)
 
 
-class MetricsError(Exception):
-    pass
-
-
 class CumulativeFlow(object):
     def __init__(
         self,
@@ -92,75 +89,15 @@ class CumulativeFlow(object):
         end_date provide a specific end date, default today()
         start_date provide a specific start date, default 30 days before end_date (inclusive)
         """
-
-        if start_date and not isinstance(start_date, datetime.date):
-            raise ValueError("start_date must be datetime.date")
-
-        if end_date and not isinstance(end_date, datetime.date):
-            raise ValueError("end_date must be datetime.date")
-
-        if days < 1:
-            raise ValueError("days must include at least 1 day")
-
-        if hasattr(start_date, "date"):
-            start_date = start_date.date()
-
-        if hasattr(end_date, "date"):
-            end_date = end_date.date()
-
-        # XXX could use partial application to make this cleaner?
-        if end_date and start_date:
-            self._index_daterange = pd.date_range(
-                start=start_date, end=end_date, freq="D", name="datetime", tz="UTC"
-            )
-        elif start_date:
-            self._index_daterange = pd.date_range(
-                start=start_date, periods=days, freq="D", name="datetime", tz="UTC"
-            )
-        else:
-            end_date = (
-                end_date
-                if end_date
-                else datetime.datetime.now(tz=datetime.timezone.utc).date()
-            )
-            self._index_daterange = pd.date_range(
-                end=end_date, periods=days, freq="D", name="datetime", tz="UTC"
-            )
-
+        self._index_daterange = _calculate_date_range(days, start_date, end_date)
         self._labels = stages
-
-        def dt_index_shift(r):
-            """If last row sum == 0 return index of row to move else None
-            """
-            return (
-                r.iloc[-1].name
-                if not r.dropna().empty and 0 == r.iloc[-1].sum()
-                else None
-            )
-
-        def combine(d1, d2):
-            d2 = d2.reindex(columns=d1.columns)
-            shift_dt_index = d2.groupby(pd.Grouper(freq="1D")).apply(dt_index_shift)
-            dt_to_shift = [dt for dt in shift_dt_index if dt is not pd.NaT]
-            for dt in dt_to_shift:
-                # use numpy datetime64 object to sort these "raw" indices
-                dt64 = dt.to_numpy()
-                new_index_dt64 = (dt.normalize() + pd.Timedelta("1D")).to_numpy()
-                old_indices_dt64 = np.where(d2.index.values == dt64)[0]
-                for old_index in old_indices_dt64:
-                    d2.index.values[old_index] = new_index_dt64
-
-            d2 = d2.resample("1D").last()
-            d2 = d2.fillna(method="ffill")
-            d2 = d2.reindex(d1.index, method="ffill")
-            return d1.combine(d2, np.add, fill_value=0)
 
         cats = pd.Series(
             pd.Categorical(self._labels, categories=self._labels, ordered=True)
         )
 
         df = pd.DataFrame([], index=self._index_daterange, columns=cats)
-        self._data = foldl(combine, df, [a.data for a in issues_stage_transitions])
+        self._data = foldl(combine_by_totals, df, [a.data for a in issues_stage_transitions])
 
     @property
     def included_dates(self):
@@ -172,3 +109,70 @@ class CumulativeFlow(object):
         """Build a DataFrame for processing (metrics, plotting, etc).
         """
         return self._data
+
+
+def _calculate_date_range(days, start_date, end_date):
+    if start_date and not isinstance(start_date, datetime.date):
+        raise ValueError("start_date must be datetime.date")
+
+    if end_date and not isinstance(end_date, datetime.date):
+        raise ValueError("end_date must be datetime.date")
+
+    if days < 1:
+        raise ValueError("days must include at least 1 day")
+
+    if hasattr(start_date, "date"):
+        start_date = start_date.date()
+
+    if hasattr(end_date, "date"):
+        end_date = end_date.date()
+
+    pd_date_range = partial(pd.date_range, freq="D", name="datetime", tz="UTC")
+
+    if end_date and start_date:
+        return pd_date_range(
+            start=start_date,
+            end=end_date
+        )
+    elif start_date:
+        return pd_date_range(
+            start=start_date,
+            periods=days
+        )
+
+    end_date = (
+        end_date
+        if end_date
+        else datetime.datetime.now(datetime.timezone.utc).date()
+    )
+    return pd_date_range(
+        end=end_date,
+        periods=days
+    )
+
+
+def dt_index_shift(r):
+    """If last row sum == 0 return index of row else None
+    """
+    return (
+        r.iloc[-1].name
+        if not r.dropna().empty and 0 == r.iloc[-1].sum()
+        else None
+    )
+
+def combine_by_totals(d1, d2):
+    d2 = d2.reindex(columns=d1.columns)
+    shift_dt_index = d2.groupby(pd.Grouper(freq="1D")).apply(dt_index_shift)
+    dt_to_shift = [dt for dt in shift_dt_index if dt is not pd.NaT]
+    for dt in dt_to_shift:
+        # use numpy datetime64 object to sort these "raw" indices
+        dt64 = dt.to_numpy()
+        new_index_dt64 = (dt.normalize() + pd.Timedelta("1D")).to_numpy()
+        old_indices_dt64 = np.where(d2.index.values == dt64)[0]
+        for old_index in old_indices_dt64:
+            d2.index.values[old_index] = new_index_dt64
+
+    d2 = d2.resample("1D").last()
+    d2 = d2.fillna(method="ffill")
+    d2 = d2.reindex(d1.index, method="ffill")
+    return d1.combine(d2, np.add, fill_value=0)
