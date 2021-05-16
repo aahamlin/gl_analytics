@@ -43,7 +43,7 @@ def test_plot_should_generate_title(filepath_png, df):
     start_date = df.index.date[0]
     end_date = df.index.date[-1]
     report = PlotReport(df, file=filepath_png.resolve(), title=f"{milestone}")
-    assert report.title == f"CFD {milestone} {start_date} {end_date}"
+    assert report.title == f"{milestone} {start_date} {end_date}"
 
 
 def test_plot_should_save_png_image(filepath_png, df):

@@ -34,7 +34,7 @@ class PlotReport:
     """Configure the output of a DataFrame to plot image (.png).
     """
 
-    def __init__(self, df, file=None, **kwargs):
+    def __init__(self, df, file=None, title="CFD", **kwargs):
         """Prepare a plot file.
 
         This is no more than a convenience wrapper to Pandas DataFrame API.
@@ -47,8 +47,7 @@ class PlotReport:
         self._df = df
         self._file = file
         self.title = " ".join([
-            "CFD",
-            kwargs.get("title", ""),
+            title,
             str(df.index.date[0]),
             str(df.index.date[-1])
         ])
