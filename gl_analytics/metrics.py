@@ -176,3 +176,39 @@ def combine_by_totals(d1, d2):
     d2 = d2.fillna(method="ffill")
     d2 = d2.reindex(d1.index, method="ffill")
     return d1.combine(d2, np.add, fill_value=0)
+
+
+class LeadCycleTimes():
+    def __init__(
+        self,
+            transitions,
+            cycletime_label=None,
+            days=30,
+            end_date=None,
+            start_date=None
+    ):
+        """Generate lead & cycle time values from issue transitions.
+        """
+
+        # XXX not sure how to use the data range
+        self._index_daterange = _calculate_date_range(days, start_date, end_date)
+        self._labels = ["lead", "cycle"]
+
+        df = pd.DataFrame([], columns=self._labels)
+        self._data = foldl(partial(combine_by_cycles, cycletime_label), df, [a.data for a in transitions])
+
+    def get_data_frame(self):
+        return self._data
+
+
+def combine_by_cycles(cycle_label, d1, d2):
+    # only uses opened, closed, and In Progress.
+    d2 = d2.filter(["opened", cycle_label, "closed"])
+    d2 = d2.replace(to_replace=0, value=np.nan)
+    d2 = d2.dropna(how="all")
+    d2 = d2.reset_index()
+    d2.columns = ["datetime", "lead", "cycle", "closed"]
+    d2["cycle"] = d2["datetime"]-d2["datetime"].shift()
+    d2["lead"] = d2["datetime"]-d2["datetime"].shift(periods=2)
+    d2 = d2.filter(["datetime", "closed", "lead", "cycle"]).dropna(how="any")
+    return d1.combine(d2.drop("closed", axis=1), np.add, fill_value=0)
