@@ -9,6 +9,8 @@ python-dotenv = "*"
 python-dateutil = "*"
 pandas = "*"
 matplotlib = "*"
+lockfile = "*"
+cachecontrol = {extras = ["filecache"], version = "*"}
 
 [dev-packages]
 pytest = "*"

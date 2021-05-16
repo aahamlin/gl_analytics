@@ -1,3 +1,4 @@
 .coverage
+.webcache
 __pycache__
 .env

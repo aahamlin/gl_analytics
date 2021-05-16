@@ -2,6 +2,7 @@
 
 """
 import argparse
+import logging
 import os
 import sys
 
@@ -10,7 +11,12 @@ import datetime
 from .issues import GitlabSession, GitlabIssuesRepository, GitlabScopedLabelResolver
 from .metrics import IssueStageTransitions, CumulativeFlow
 from .report import CsvReport, PlotReport
+from .utils import timer
 from .config import load_config
+
+logging.basicConfig()
+logging.getLogger().setLevel(logging.INFO)
+# logging.getLogger('gl_analytics.utils').setLevel(logging.DEBUG)
 
 DEFAULT_SERIES = [
     "opened",
@@ -118,12 +124,18 @@ class Main:
             milestone=self.prog_args.milestone,
             resolvers=[GitlabScopedLabelResolver],
         )
-        issues = repository.list()
+
+        log = logging.getLogger("main")
+
+        with timer("Listing issues"):
+            issues = repository.list()
 
         # grab all the transitions from the elements in the list
-        transitions = build_transitions(issues)
+        with timer("Building data"):
+            transitions = build_transitions(issues)
 
-        cf = CumulativeFlow(transitions, stages=DEFAULT_SERIES, days=days)
+        with timer("Aggregations"):
+            cf = CumulativeFlow(transitions, stages=DEFAULT_SERIES, days=days)
 
         report_cls, default_file = self.supported_reports[self.prog_args.report]
         report = report_cls(
@@ -131,7 +143,10 @@ class Main:
             file=(outfile or default_file),
             title=self.prog_args.milestone
         )
-        report.export()
+
+        with timer("Export"):
+            report.export()
+
         if outfile:
             print(f"Created '{outfile}'.")
 

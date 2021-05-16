@@ -3,11 +3,15 @@
 import sys
 import requests
 
+from cachecontrol import CacheControlAdapter
+from cachecontrol.caches.file_cache import FileCache
+from cachecontrol.heuristics import ExpiresAfter
 from datetime import datetime
 from dateutil import parser as date_parser
 from urllib.parse import urlencode, urljoin
 
 from .func import foldl
+
 
 class IssuesError(Exception):
     pass
@@ -25,6 +29,18 @@ class GitlabSession(Session):
         self._base_url = base_url
         self._access_token = access_token
 
+        sess = requests.Session()
+        sess.headers.update({"PRIVATE-TOKEN": self._access_token})
+
+        # XXX filecache does NOT clean up old files, it will grow infiinitely
+        # add some logic to remove old files
+        cache = FileCache('.webcache')
+        adapter = CacheControlAdapter(cache=cache, heuristic=ExpiresAfter(hours=1))
+        sess.mount("https://", adapter)
+
+        self.session = sess
+
+
     def get(self, path):
         """Calls request.get(url) appending relative path to session baseurl.
 
@@ -37,8 +53,8 @@ class GitlabSession(Session):
         if path.startswith("/"):
             raise ValueError
         url = urljoin(self.baseurl, path)
-        headers = {"PRIVATE-TOKEN": self._access_token}
-        return requests.get(url, headers=headers)
+
+        return self.session.get(url)
 
     @property
     def baseurl(self):
@@ -87,8 +103,12 @@ class GitlabIssuesRepository(AbstractRepository):
         """Return issues from the repository."""
         return [x for x in self._page_results()]
 
+    # XXX modify this to return a tuple of url and list of params
     def _build_request_url(self):
         url = "groups/{0}/issues".format(self._group)
+
+        # XXX rebuild using sorted tuples for caching effectiveness
+        # see also https://cachecontrol.readthedocs.io/en/latest/tips.html#query-string-params
         params = {
             "pagination": "keyset",
             "scope": "all",
@@ -96,6 +116,8 @@ class GitlabIssuesRepository(AbstractRepository):
         #print("built url:", url, file=sys.stderr)
         #print("built params:", params, file=sys.stderr)
         return "{0}?{1}".format(url, urlencode(params))
+
+
 
     def _page_results(self):
         """Generator of issues from pages of results."""
@@ -105,6 +127,7 @@ class GitlabIssuesRepository(AbstractRepository):
 
         hasMore = True
         while hasMore:
+            # XXX modify this to use url and list of params, e.g. requests.get(url, params=...)
             # make request
             r1 = self._session.get(url)
             r1.raise_for_status()
@@ -164,9 +187,6 @@ class GitlabScopedLabelResolver(AbstractResolver):
     def resolve(self, issue):
         url = self._build_request_url(issue.project_id, issue.issue_id)
         res = self._fetch_results(url)
-
-        # XXX Adding a named to a dictionary is problematic, refactor this better.
-        #return {"_scoped_labels": self._find_scoped_labels(item, res)}
         issue.label_events = self._find_scoped_labels(res)
 
     def _build_request_url(self, project_id, issue_id):
