@@ -9,7 +9,7 @@ import sys
 import datetime
 
 from .issues import GitlabSession, GitlabIssuesRepository, GitlabScopedLabelResolver
-from .metrics import IssueStageTransitions, CumulativeFlow
+from .metrics import IssueStageTransitions, CumulativeFlow, LeadCycleTimes
 from .report import CsvReport, PlotReport
 from .utils import timer
 from .config import load_config
@@ -134,11 +134,12 @@ class Main:
             transitions = build_transitions(issues)
 
         with timer("Aggregations"):
-            cf = CumulativeFlow(transitions, stages=DEFAULT_SERIES, days=days)
+            #cf = CumulativeFlow(transitions, stages=DEFAULT_SERIES, days=days)
+            result = LeadCycleTimes(transitions, cycletime_label="In Progress", days=days)
 
         report_cls, default_file = self.supported_reports[self.prog_args.report]
         report = report_cls(
-            cf.get_data_frame(),
+            result.get_data_frame(),
             file=(outfile or default_file),
             title=self.prog_args.milestone
         )

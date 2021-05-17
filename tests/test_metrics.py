@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from gl_analytics.metrics import (
     CumulativeFlow,
     IssueStageTransitions,
+    # LeadCycleRollingAverage,
     LeadCycleTimes
 )
 
@@ -671,6 +672,50 @@ def test_leadcycletimes_should_be_additive(stages):
     data = pd.DataFrame.from_records(test_data, index=["datetime"])
     tr = SimpleNamespace(data=data)
     lct = LeadCycleTimes(
+        [tr],
+        cycletime_label="inprogress",
+        start_date=datetime(2021, 3, 15),
+        end_date=datetime(2021, 3, 19)
+    )
+    df = lct.get_data_frame()
+    print(df.to_csv())
+    expected_lead = closedAt-openedAt
+    expected_cycle = closedAt-inProgressAt
+    print(expected_lead, expected_cycle)
+    assert all([a == b for a, b in zip(df["lead"].array, [expected_lead])])
+    assert all([a == b for a, b in zip(df["cycle"].array, [expected_cycle])])
+
+
+@pytest.mark.skip(reason="not implemented")
+def test_leadcycletimes_rolling_should_be_additive(stages):
+    """ Lead and cycle times count days between opened, in progress, and closed.
+
+    The rolling window prints the mean average of time.
+    """
+    openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
+    inProgressAt = openedAt + timedelta(days=2)
+    closedAt = datetime(2021, 3, 18, 21, tzinfo=timezone.utc)
+
+    openedAt2 = datetime(2021, 3, 16, 12, tzinfo=timezone.utc)
+    inProgressAt2 = openedAt2 + timedelta(days=1)
+    closedAt2 = openedAt2 + timedelta(days=2)
+
+    test_datas = [
+        [
+            {"datetime": openedAt, "opened": 1},
+            {"datetime": inProgressAt, "todo": 0, "inprogress": 1},
+            {"datetime": closedAt, "review": 0, "closed": 1},
+        ],
+        [
+            {"datetime": openedAt2, "opened": 1},
+            {"datetime": inProgressAt2, "todo": 0, "inprogress": 1},
+            {"datetime": closedAt2, "review": 0, "closed": 1},
+        ],
+    ]
+
+    data = pd.DataFrame.from_records(test_datas, index=["datetime"])
+    tr = SimpleNamespace(data=data)
+    lct = LeadCycleRollingAverage(
         [tr],
         cycletime_label="inprogress",
         start_date=datetime(2021, 3, 15),
