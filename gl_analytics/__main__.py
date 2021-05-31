@@ -91,7 +91,7 @@ def build_transitions(issues):
     """Create a list of transitions from a list of issues.
     """
     return [
-        IssueStageTransitions(i, label_events=i.label_events)
+        IssueStageTransitions(i)
         for i in issues
     ]
 

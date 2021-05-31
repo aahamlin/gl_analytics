@@ -25,6 +25,17 @@ class IssueStageTransitions:
         opened = issue.opened_at
         closed = issue.closed_at
         index_name = "datetime"
+        id_name = "id"
+        type_name = "type"
+        project_name = "project"
+
+        opened = issue.opened_at
+        closed = issue.closed_at
+        label_events = issue.label_events
+
+        issue_id = issue.issue_id
+        project_id = issue.project_id
+        issue_type = issue.issue_type
 
         # open ends at next transition start or datetime.max
         if len(label_events) > 0:
@@ -34,11 +45,11 @@ class IssueStageTransitions:
         else:
             opened_end = None
 
-        def to_record(issue_id, label, start, end):
-            yield dict(zip(["issue_id", index_name, label], [issue_id, start, 1]))
+        def to_record(label, start, end):
+            yield dict(zip([index_name, project_name, id_name, type_name, label], [start, project_id, issue_id, issue_type, 1]))
 
             if end:
-                yield dict(zip(["issue_id", index_name, label], [issue_id, end, 0]))
+                yield dict(zip([index_name, project_name, id_name, type_name, label], [end, project_id, issue_id, issue_type, 0]))
 
         transitions = []
 
@@ -198,7 +209,7 @@ class LeadCycleTimes():
 
         # XXX not sure how to use the data range
         self._index_daterange = _calculate_date_range(days, start_date, end_date)
-        self._labels = ["datetime", "lead", "cycle"]
+        self._labels = ["datetime", "lead", "cycle", "open", "wip", "project", "id", "type"]
 
         df = pd.DataFrame([], columns=self._labels)
         self._data = foldl(partial(combine_by_cycles, cycletime_label), df, [a.data for a in transitions])
@@ -210,20 +221,21 @@ class LeadCycleTimes():
 
 def combine_by_cycles(cycle_label, d1, d2):
     # only uses opened, closed, and In Progress.
-    # print("Before:", d2)
-    # print(f"Filter by {cycle_label}")
-    d2 = d2.filter(["opened", cycle_label, "closed"])
-    # print("After:", d2)
+    d2 = d2.filter(["opened", cycle_label, "closed", "project", "id", "type"])
     d2 = d2.replace(to_replace=0, value=np.nan)
     d2 = d2.dropna(how="all")
     d2 = d2.reset_index()
     # d2.columns = ["datetime", "lead", "cycle", "closed"]
-    d2["cycle"] = d2["datetime"]-d2["datetime"].shift()
-    if cycle_label not in d2:
-        d2["lead"] = d2["cycle"]
-    else:
-        d2["lead"] = d2["datetime"]-d2["datetime"].shift(periods=2)
-    d2 = d2.filter(["datetime", "closed", "lead", "cycle"]).dropna(how="any")
-    d2 = d2.drop("closed", axis=1, errors="ignore")
-    # print("\nnew data\n", d2.to_dict(orient="records"))
-    return d1.append(d2.to_dict(orient="records"))
+    wip_date = d2["datetime"].shift()
+    open_date = wip_date if cycle_label not in d2 else d2["datetime"].shift(periods=2)
+
+    d2["cycle"] = d2["datetime"]-wip_date
+    d2["lead"] = d2["datetime"]-open_date
+
+    d2["open"] = open_date
+    d2["wip"] = wip_date
+
+    d2 = d2.filter(["datetime", "closed", "lead", "cycle", "open", "wip", "project", "id", "type"]).dropna(how="any")
+    # d2 = d2.drop("closed", axis=1, errors="ignore")
+    print("\nnew data\n", d2)
+    return d1.append(d2)

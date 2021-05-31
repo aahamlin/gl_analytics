@@ -34,12 +34,11 @@ class GitlabSession(Session):
 
         # XXX filecache does NOT clean up old files, it will grow infiinitely
         # add some logic to remove old files
-        cache = FileCache('.webcache')
+        cache = FileCache(".webcache")
         adapter = CacheControlAdapter(cache=cache, heuristic=ExpiresAfter(hours=1))
         sess.mount("https://", adapter)
 
         self.session = sess
-
 
     def get(self, path):
         """Calls request.get(url) appending relative path to session baseurl.
@@ -72,8 +71,8 @@ class AbstractResolver(object):
 
 
 class GitlabIssuesRepository(AbstractRepository):
-    """This is specifically a GitLab Issue repository. Current GitLab version is 13.11.0-pre.
-    """
+    """This is specifically a GitLab Issue repository. Current GitLab version is 13.11.0-pre."""
+
     def __init__(self, session, group=None, milestone=None, resolvers=[]):
         """Initialize a repository.
 
@@ -112,12 +111,12 @@ class GitlabIssuesRepository(AbstractRepository):
         params = {
             "pagination": "keyset",
             "scope": "all",
-            "milestone": self._milestone}
-        #print("built url:", url, file=sys.stderr)
-        #print("built params:", params, file=sys.stderr)
+            "state": "closed",
+            #  "milestone": self._milestone
+        }
+        # print("built url:", url, file=sys.stderr)
+        # print("built params:", params, file=sys.stderr)
         return "{0}?{1}".format(url, urlencode(params))
-
-
 
     def _page_results(self):
         """Generator of issues from pages of results."""
@@ -145,10 +144,9 @@ class GitlabIssuesRepository(AbstractRepository):
                 # setup next page request
                 next_link = r1.links["next"]
                 url = next_link["url"]
-                #print("next page:", url, file=sys.stderr)
+                # print("next page:", url, file=sys.stderr)
             else:
                 hasMore = False
-
 
     def _build_issue_from(self, item):
         # print('creating Issue from item', json.dumps(item))
@@ -158,11 +156,19 @@ class GitlabIssuesRepository(AbstractRepository):
         closed_at_str = item.get("closed_at")
         closed_at = date_parser.parse(closed_at_str) if closed_at_str else None
         label_events = None
+        issue_type = self._find_type_label(item)
         issue = Issue(
-            issue_id, project_id, opened_at, closed_at=closed_at
+            issue_id, project_id, opened_at, closed_at=closed_at, issue_type=issue_type
         )
         return issue
 
+    def _find_type_label(self, item):
+        type_labels = [
+            t.lstrip("type::") for t in item.get("labels") if t.startswith("type::")
+        ][:1]
+
+        return type_labels[0] if type_labels else None
+        
 
     def _resolve_fields(self, issue):
         for resolver_cls in self._resolvers:
@@ -226,7 +232,6 @@ class GitlabScopedLabelResolver(AbstractResolver):
           label or closing the issue).
         """
 
-
         def accumulate_start_end_datetimes(acc, event):
             try:
                 action, label, datetimestr = self._get_workflow_steps(event)
@@ -264,7 +269,13 @@ class GitlabScopedLabelResolver(AbstractResolver):
 
 class Issue(object):
     def __init__(
-        self, issue_id, project_id, opened_at, closed_at=None, label_events=None
+        self,
+        issue_id,
+        project_id,
+        opened_at,
+        closed_at=None,
+        label_events=None,
+        issue_type=None,
     ):
         """initializes an issue.
 
@@ -275,6 +286,7 @@ class Issue(object):
         self._opened_at = opened_at
         self._closed_at = closed_at
         self._label_events = label_events
+        self._issue_type = issue_type
 
     @property
     def issue_id(self):
@@ -300,5 +312,9 @@ class Issue(object):
     def label_events(self, label_events):
         self._label_events = label_events
 
-    def __str__(self): # pragma: no cover
-        return f"Issue(id:{self.issue_id}, p:{self.project_id}, o:{self.opened_at}, c:{self.closed_at}, e:{self.label_events})"
+    @property
+    def issue_type(self):
+        return self._issue_type
+
+    def __str__(self):  # pragma: no cover
+        return f"Issue(id:{self.issue_id}, p:{self.project_id}, t:{self.issue_type} o:{self.opened_at}, c:{self.closed_at}, e:{self.label_events})"
