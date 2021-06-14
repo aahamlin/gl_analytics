@@ -20,7 +20,6 @@ logging.getLogger().setLevel(logging.INFO)
 
 DEFAULT_SERIES = [
     "opened",
-    "Ready",
     "In Progress",
     "Code Review",
     "closed",

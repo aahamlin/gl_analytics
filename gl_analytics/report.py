@@ -34,7 +34,7 @@ class PlotReport:
     """Configure the output of a DataFrame to plot image (.png).
     """
 
-    def __init__(self, df, file=None, title="CFD", ylimit=True, **kwargs):
+    def __init__(self, df, file=None, title="CFD", ylimit=False, **kwargs):
         """Prepare a plot file.
 
         This is no more than a convenience wrapper to Pandas DataFrame API.
@@ -45,7 +45,7 @@ class PlotReport:
         title - Extra title, typically represents the search criteria, e.g. milestone name
         ylimit - If True, limit the y-axis to total excluding the last category
         """
-        self._df = df
+        self._df = df[df.columns[::-1]]
         self._file = file
         self.title = " ".join([
             title,
