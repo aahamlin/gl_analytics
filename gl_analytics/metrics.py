@@ -16,10 +16,14 @@ class IssueStageTransitions:
     Each row is indexed by "datetime".
     """
 
-    def __init__(self, opened, closed=None, label_events=[]):
+    def __init__(self, issue, label_events=[]):
 
         # XXX This could definitely be cleaned up by constructing the list of dicts more directly
 
+        print("Issue:", issue)
+        issue_id = issue.issue_id
+        opened = issue.opened_at
+        closed = issue.closed_at
         index_name = "datetime"
 
         # open ends at next transition start or datetime.max
@@ -30,25 +34,25 @@ class IssueStageTransitions:
         else:
             opened_end = None
 
-        def to_record(label, start, end):
-            yield dict(zip([index_name, label], [start, 1]))
+        def to_record(issue_id, label, start, end):
+            yield dict(zip(["issue_id", index_name, label], [issue_id, start, 1]))
 
             if end:
-                yield dict(zip([index_name, label], [end, 0]))
+                yield dict(zip(["issue_id", index_name, label], [issue_id, end, 0]))
 
         transitions = []
 
-        transitions.extend(to_record("opened", opened, opened_end))
+        transitions.extend(to_record(issue_id, "opened", opened, opened_end))
 
         if len(label_events) > 0 and closed:
             last_label_event = label_events.pop()
             label_events.append((last_label_event[0], last_label_event[1], closed))
 
         for event in label_events:
-            transitions.extend(to_record(*event))
+            transitions.extend(to_record(issue_id, *event))
 
         if closed:
-            transitions.extend(to_record("closed", closed, None))
+            transitions.extend(to_record(issue_id, "closed", closed, None))
 
         records = {}
         for t in transitions:
@@ -200,19 +204,26 @@ class LeadCycleTimes():
         self._data = foldl(partial(combine_by_cycles, cycletime_label), df, [a.data for a in transitions])
 
     def get_data_frame(self):
+        print("Data", self._data)
         return self._data
 
 
 def combine_by_cycles(cycle_label, d1, d2):
     # only uses opened, closed, and In Progress.
+    print("Before:", d2)
+    print(f"Filter by {cycle_label}")
     d2 = d2.filter(["opened", cycle_label, "closed"])
+    print("After:", d2)
     d2 = d2.replace(to_replace=0, value=np.nan)
     d2 = d2.dropna(how="all")
     d2 = d2.reset_index()
     # d2.columns = ["datetime", "lead", "cycle", "closed"]
     d2["cycle"] = d2["datetime"]-d2["datetime"].shift()
-    d2["lead"] = d2["datetime"]-d2["datetime"].shift(periods=2)
+    if cycle_label not in d2:
+        d2["lead"] = d2["cycle"]
+    else:
+        d2["lead"] = d2["datetime"]-d2["datetime"].shift(periods=2)
     d2 = d2.filter(["datetime", "closed", "lead", "cycle"]).dropna(how="any")
     d2 = d2.drop("closed", axis=1, errors="ignore")
-    print("\nnew data\n", d2)
-    return d1.append(d2)
+    print("\nnew data\n", d2.to_dict(orient="records"))
+    return d1.append(d2.to_dict(orient="records"))

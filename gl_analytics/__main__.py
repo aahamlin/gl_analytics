@@ -91,7 +91,7 @@ def build_transitions(issues):
     """Create a list of transitions from a list of issues.
     """
     return [
-        IssueStageTransitions(i.opened_at, i.closed_at, label_events=i.label_events)
+        IssueStageTransitions(i, label_events=i.label_events)
         for i in issues
     ]
 
@@ -128,10 +128,12 @@ class Main:
 
         with timer("Listing issues"):
             issues = repository.list()
+            log.info(f"Retrieved {len(issues)} issues for {self.prog_args.milestone}")
 
         # grab all the transitions from the elements in the list
         with timer("Building data"):
             transitions = build_transitions(issues)
+            log.info(f"Identified {len(transitions)} transitions for {self.prog_args.milestone}")
 
         with timer("Aggregations"):
             #cf = CumulativeFlow(transitions, stages=DEFAULT_SERIES, days=days)
