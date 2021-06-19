@@ -53,17 +53,17 @@ class IssueStageTransitions:
 
         transitions = []
 
-        transitions.extend(to_record(issue_id, "opened", opened, opened_end))
+        transitions.extend(to_record("opened", opened, opened_end))
 
         if len(label_events) > 0 and closed:
             last_label_event = label_events.pop()
             label_events.append((last_label_event[0], last_label_event[1], closed))
 
         for event in label_events:
-            transitions.extend(to_record(issue_id, *event))
+            transitions.extend(to_record(*event))
 
         if closed:
-            transitions.extend(to_record(issue_id, "closed", closed, None))
+            transitions.extend(to_record("closed", closed, None))
 
         records = {}
         for t in transitions:

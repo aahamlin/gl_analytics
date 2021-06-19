@@ -15,16 +15,16 @@ def test_build_transitions_from_issues():
     created_at = datetime(2021, 3, 13, 10, tzinfo=timezone.utc)
 
     test_data0 = [
-        {"datetime": created_at, "issue_id": 1, "opened": 1},
-        {"datetime": datetime(2021, 3, 14, 10, tzinfo=timezone.utc), "issue_id": 1, "opened": 0, "ready": 1},
-        {"datetime": datetime(2021, 3, 15, 10, tzinfo=timezone.utc), "issue_id": 1, "ready": 0, "in progress": 1},
-        {"datetime": datetime(2021, 3, 16, 10, tzinfo=timezone.utc), "issue_id": 1, "in progress": 0, "done": 1},
+        {"datetime": created_at, "project": 2, "id": 1, "type": None, "opened": 1},
+        {"datetime": datetime(2021, 3, 14, 10, tzinfo=timezone.utc), "project": 2, "id": 1, "type": None, "opened": 0, "ready": 1},
+        {"datetime": datetime(2021, 3, 15, 10, tzinfo=timezone.utc), "project": 2, "id": 1, "type": None, "ready": 0, "in progress": 1},
+        {"datetime": datetime(2021, 3, 16, 10, tzinfo=timezone.utc), "project": 2, "id": 1, "type": None, "in progress": 0, "done": 1},
     ]
     test_data1 = [
-        {"datetime": created_at, "issue_id": 2, "opened": 1},
-        {"datetime": datetime(2021, 3, 14, 10, tzinfo=timezone.utc), "issue_id": 2, "opened": 0, "ready": 1},
-        {"datetime": datetime(2021, 3, 15, 10, tzinfo=timezone.utc), "issue_id": 2, "ready": 0, "in progress": 1},
-        {"datetime": datetime(2021, 3, 16, 10, tzinfo=timezone.utc), "issue_id": 2, "in progress": 0, "done": 1},
+        {"datetime": created_at, "project": 2, "id": 2, "type": None, "opened": 1},
+        {"datetime": datetime(2021, 3, 14, 10, tzinfo=timezone.utc), "project": 2, "id": 2, "type": None, "opened": 0, "ready": 1},
+        {"datetime": datetime(2021, 3, 15, 10, tzinfo=timezone.utc), "project": 2, "id": 2, "type": None, "ready": 0, "in progress": 1},
+        {"datetime": datetime(2021, 3, 16, 10, tzinfo=timezone.utc), "project": 2, "id": 2, "type": None, "in progress": 0, "done": 1},
     ]
 
     expected0 = pd.DataFrame.from_records(test_data0, index=["datetime"])

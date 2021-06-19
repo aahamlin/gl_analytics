@@ -163,12 +163,13 @@ class GitlabIssuesRepository(AbstractRepository):
         return issue
 
     def _find_type_label(self, item):
-        type_labels = [
-            t.lstrip("type::") for t in item.get("labels") if t.startswith("type::")
-        ][:1]
-
-        return type_labels[0] if type_labels else None
-        
+        try:
+            type_labels = [
+                t.lstrip("type::") for t in item.get("labels") if t.startswith("type::")
+            ][:1]
+            return type_labels[0]
+        except TypeError:
+            return None
 
     def _resolve_fields(self, issue):
         for resolver_cls in self._resolvers:

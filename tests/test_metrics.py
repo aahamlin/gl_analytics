@@ -15,7 +15,7 @@ from gl_analytics.metrics import (
 
 
 def test_issue_stage_transitions_should_be_records():
-
+    openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
     wfData = [
         (
             "ready",
@@ -33,20 +33,18 @@ def test_issue_stage_transitions_should_be_records():
             None,
         ),
     ]
-
-    openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
-    issue = SimpleNamespace(issue_id=1, opened_at=openedAt, closed_at=None)
+    issue = SimpleNamespace(issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=None, label_events=wfData)
 
     test_data = [
-        {"datetime": openedAt, "issue_id": 1, "opened": 1},
-        {"datetime": datetime(2021, 3, 14, 15, 15, tzinfo=timezone.utc), "issue_id": 1, "opened": 0, "ready": 1},
-        {"datetime": datetime(2021, 3, 15, 10, tzinfo=timezone.utc), "issue_id": 1, "ready": 0, "in progress": 1},
-        {"datetime": datetime(2021, 3, 16, 10, tzinfo=timezone.utc), "issue_id": 1, "in progress": 0, "done": 1},
+        {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
+        {"datetime": datetime(2021, 3, 14, 15, 15, tzinfo=timezone.utc), "project": 2, "id": 1, "type": "Bug", "opened": 0, "ready": 1},
+        {"datetime": datetime(2021, 3, 15, 10, tzinfo=timezone.utc), "project": 2, "id": 1, "type": "Bug", "ready": 0, "in progress": 1},
+        {"datetime": datetime(2021, 3, 16, 10, tzinfo=timezone.utc), "project": 2, "id": 1, "type": "Bug", "in progress": 0, "done": 1},
     ]
 
     expected = pd.DataFrame.from_records(test_data, index=["datetime"])
     print(expected)
-    actual = IssueStageTransitions(issue, label_events=wfData)
+    actual = IssueStageTransitions(issue)
     print(actual.data)
     assert expected.equals(actual.data)
 
@@ -54,8 +52,6 @@ def test_issue_stage_transitions_should_be_records():
 def test_issue_transitions_should_end_labels_when_closed():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
     closedAt = datetime(2021, 3, 18, tzinfo=timezone.utc)
-    issue = SimpleNamespace(issue_id=1, opened_at=openedAt, closed_at=closedAt)
-
     wfData = [
         (
             "todo",
@@ -68,59 +64,60 @@ def test_issue_transitions_should_end_labels_when_closed():
             None,
         ),
     ]
+    issue = SimpleNamespace(issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=closedAt, label_events=wfData)
 
     test_data = [
-        {"datetime": openedAt, "issue_id": 1, "opened": 1},
-        {"datetime": openedAt + timedelta(days=1), "issue_id": 1, "opened": 0, "todo": 1},
-        {"datetime": openedAt + timedelta(days=2), "issue_id": 1, "todo": 0, "done": 1},
-        {"datetime": closedAt, "issue_id": 1, "done": 0, "closed": 1},
+        {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
+        {"datetime": openedAt + timedelta(days=1), "project": 2, "id": 1, "type": "Bug", "opened": 0, "todo": 1},
+        {"datetime": openedAt + timedelta(days=2), "project": 2, "id": 1, "type": "Bug", "todo": 0, "done": 1},
+        {"datetime": closedAt, "project": 2, "id": 1, "type": "Bug", "done": 0, "closed": 1},
     ]
 
     expected = pd.DataFrame.from_records(test_data, index=["datetime"])
-    actual = IssueStageTransitions(issue, label_events=wfData)
+    actual = IssueStageTransitions(issue)
     assert expected.equals(actual.data)
 
 
 def test_issue_transitions_should_end_open_when_closed():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
     closedAt = datetime(2021, 3, 18, tzinfo=timezone.utc)
-    issue = SimpleNamespace(issue_id=1, opened_at=openedAt, closed_at=closedAt)
+    issue = SimpleNamespace(issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=closedAt, label_events=[])
 
     test_data = [
-        {"datetime": openedAt, "issue_id": 1, "opened": 1},
-        {"datetime": closedAt, "issue_id": 1, "opened": 0, "closed": 1},
+        {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
+        {"datetime": closedAt, "project": 2, "id": 1, "type": "Bug", "opened": 0, "closed": 1},
     ]
 
     expected = pd.DataFrame.from_records(test_data, index=["datetime"])
-    actual = IssueStageTransitions(issue, label_events=[])
+    actual = IssueStageTransitions(issue)
     assert expected.equals(actual.data)
 
 
 def test_issue_transitions_should_open_indefinitely():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
-    issue = SimpleNamespace(issue_id=1, opened_at=openedAt, closed_at=None)
+    issue = SimpleNamespace(issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=None, label_events=[])
 
     test_data = [
-        {"datetime": openedAt, "issue_id": 1, "opened": 1},
+        {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
     ]
 
     expected = pd.DataFrame.from_records(test_data, index=["datetime"])
-    actual = IssueStageTransitions(issue, label_events=[])
+    actual = IssueStageTransitions(issue)
     assert expected.equals(actual.data)
 
 
 def test_issue_transitions_should_provide_str():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
     closedAt = datetime(2021, 3, 18, tzinfo=timezone.utc)
-    issue = SimpleNamespace(issue_id=1, opened_at=openedAt, closed_at=closedAt)
+    issue = SimpleNamespace(issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=closedAt, label_events=[])
 
     test_data = [
-        {"datetime": openedAt, "issue_id": 1, "opened": 1},
-        {"datetime": closedAt, "issue_id": 1, "opened": 0, "closed": 1},
+        {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
+        {"datetime": closedAt, "project": 2, "id": 1, "type": "Bug", "opened": 0, "closed": 1},
     ]
 
     expected = pd.DataFrame.from_records(test_data, index=["datetime"])
-    actual = IssueStageTransitions(issue, label_events=[])
+    actual = IssueStageTransitions(issue)
     assert str(expected) == str(actual)
 
 
