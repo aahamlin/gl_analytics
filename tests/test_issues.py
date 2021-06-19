@@ -112,7 +112,6 @@ def test_scopelabelresolver_includes_qualifying_events(session):
 
     the_issue = issue_list[0]
     assert len(the_issue.label_events) == 2  # designing, in progress
-
     assert all(compare_label_events(a, b) for a, b in zip(expected_labels, the_issue.label_events))
 
 
@@ -145,3 +144,31 @@ def test_scopedlabelresolver_skips_non_qualifying_events(session):
     assert len(the_issue.label_events) == 1  # designing
 
     assert compare_label_events(expected_labels[0], the_issue.label_events[0])
+
+
+@pytest.mark.usefixtures("get_issues_with_label")
+def test_issue_with_typelabel_should_set_type(session):
+    repo = issues.GitlabIssuesRepository(
+        session,
+        group="gozynta",
+        milestone="mb_v1.3"
+    )
+
+    results = repo.list()
+    assert len(results) == 1
+    the_issue = results[0]
+    assert the_issue.issue_type == "Bug"
+
+
+@pytest.mark.usefixtures("get_issues")
+def test_issue_without_typelabel_should_not_set_type(session):
+    repo = issues.GitlabIssuesRepository(
+        session,
+        group="gozynta",
+        milestone="mb_v1.3"
+    )
+
+    results = repo.list()
+    assert len(results) == 1
+    the_issue = results[0]
+    assert the_issue.issue_type is None

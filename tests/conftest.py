@@ -20,16 +20,17 @@ def df():
         "inprogress": [0, 1, 2, 3, 1],
         "done": [0, 0, 0, 1, 2],
     }
-    df = pd.DataFrame(data, index=pd.date_range(
-        start="2021-03-15", end="2021-03-19", freq="D", name="datetime", tz="UTC"
-    ), columns=data.keys())
+    df = pd.DataFrame(
+        data,
+        index=pd.date_range(start="2021-03-15", end="2021-03-19", freq="D", name="datetime", tz="UTC"),
+        columns=data.keys(),
+    )
     return df
 
 
 @pytest.fixture
 def fake_timestamp():
-    """ 2021 Apr 1, 12:00 AM
-    """
+    """2021 Apr 1, 12:00 AM"""
     return datetime.datetime(2021, 4, 1, tzinfo=datetime.timezone.utc)
 
 
@@ -43,12 +44,13 @@ def patch_datetime_now(monkeypatch, fake_timestamp):
       datetime.datetime.now()
     ```
     """
+
     class mydatetime:
         @classmethod
         def now(cls, *args, **kwargs):
             return fake_timestamp
 
-    monkeypatch.setattr(datetime, 'datetime', mydatetime)
+    monkeypatch.setattr(datetime, "datetime", mydatetime)
 
 
 @pytest.fixture
@@ -104,4 +106,12 @@ def get_mixed_labels(requests_mock):
     requests_mock.get(
         "https://gitlab.com/api/v4/projects/8273019/issues/2/resource_label_events",
         body=to_bytes(TestData.resource_label_events.excluded_stages),
+    )
+
+
+@pytest.fixture
+def get_issues_with_label(requests_mock):
+    requests_mock.get(
+        "https://gitlab.com/api/v4/groups/gozynta/issues",
+        body=to_bytes(TestData.issues.labeled.body),
     )

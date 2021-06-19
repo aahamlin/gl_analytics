@@ -9,8 +9,7 @@ from types import SimpleNamespace
 from gl_analytics.metrics import (
     CumulativeFlow,
     IssueStageTransitions,
-    # LeadCycleRollingAverage,
-    LeadCycleTimes
+    LeadCycleTimes,
 )
 
 
@@ -33,13 +32,36 @@ def test_issue_stage_transitions_should_be_records():
             None,
         ),
     ]
-    issue = SimpleNamespace(issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=None, label_events=wfData)
+    issue = SimpleNamespace(
+        issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=None, label_events=wfData
+    )
 
     test_data = [
         {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
-        {"datetime": datetime(2021, 3, 14, 15, 15, tzinfo=timezone.utc), "project": 2, "id": 1, "type": "Bug", "opened": 0, "ready": 1},
-        {"datetime": datetime(2021, 3, 15, 10, tzinfo=timezone.utc), "project": 2, "id": 1, "type": "Bug", "ready": 0, "in progress": 1},
-        {"datetime": datetime(2021, 3, 16, 10, tzinfo=timezone.utc), "project": 2, "id": 1, "type": "Bug", "in progress": 0, "done": 1},
+        {
+            "datetime": datetime(2021, 3, 14, 15, 15, tzinfo=timezone.utc),
+            "project": 2,
+            "id": 1,
+            "type": "Bug",
+            "opened": 0,
+            "ready": 1,
+        },
+        {
+            "datetime": datetime(2021, 3, 15, 10, tzinfo=timezone.utc),
+            "project": 2,
+            "id": 1,
+            "type": "Bug",
+            "ready": 0,
+            "in progress": 1,
+        },
+        {
+            "datetime": datetime(2021, 3, 16, 10, tzinfo=timezone.utc),
+            "project": 2,
+            "id": 1,
+            "type": "Bug",
+            "in progress": 0,
+            "done": 1,
+        },
     ]
 
     expected = pd.DataFrame.from_records(test_data, index=["datetime"])
@@ -53,18 +75,16 @@ def test_issue_transitions_should_end_labels_when_closed():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
     closedAt = datetime(2021, 3, 18, tzinfo=timezone.utc)
     wfData = [
-        (
-            "todo",
-            openedAt + timedelta(days=1),
-            openedAt + timedelta(days=2)
-        ),
+        ("todo", openedAt + timedelta(days=1), openedAt + timedelta(days=2)),
         (
             "done",
             openedAt + timedelta(days=2),
             None,
         ),
     ]
-    issue = SimpleNamespace(issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=closedAt, label_events=wfData)
+    issue = SimpleNamespace(
+        issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=closedAt, label_events=wfData
+    )
 
     test_data = [
         {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
@@ -81,7 +101,9 @@ def test_issue_transitions_should_end_labels_when_closed():
 def test_issue_transitions_should_end_open_when_closed():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
     closedAt = datetime(2021, 3, 18, tzinfo=timezone.utc)
-    issue = SimpleNamespace(issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=closedAt, label_events=[])
+    issue = SimpleNamespace(
+        issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=closedAt, label_events=[]
+    )
 
     test_data = [
         {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
@@ -95,7 +117,9 @@ def test_issue_transitions_should_end_open_when_closed():
 
 def test_issue_transitions_should_open_indefinitely():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
-    issue = SimpleNamespace(issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=None, label_events=[])
+    issue = SimpleNamespace(
+        issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=None, label_events=[]
+    )
 
     test_data = [
         {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
@@ -109,7 +133,9 @@ def test_issue_transitions_should_open_indefinitely():
 def test_issue_transitions_should_provide_str():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
     closedAt = datetime(2021, 3, 18, tzinfo=timezone.utc)
-    issue = SimpleNamespace(issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=closedAt, label_events=[])
+    issue = SimpleNamespace(
+        issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=closedAt, label_events=[]
+    )
 
     test_data = [
         {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
@@ -193,12 +219,7 @@ def test_cumulative_flow_counts_forward(stages):
 
     data = pd.DataFrame.from_records(test_data, index=["datetime"])
     tr = SimpleNamespace(data=data)
-    cf = CumulativeFlow(
-        [tr],
-        stages=stages,
-        start_date=datetime(2021, 3, 15),
-        end_date=datetime(2021, 3, 16)
-    )
+    cf = CumulativeFlow([tr], stages=stages, start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 16))
     df = cf.get_data_frame()
     print(df.to_csv())
     assert all([a == b for a, b in zip(df["todo"].array, [1, 0])])
@@ -217,12 +238,7 @@ def test_cumulative_flow_counts_backwards(stages):
     data = pd.DataFrame.from_records(test_data, index=["datetime"])
     tr = SimpleNamespace(data=data)
 
-    cf = CumulativeFlow(
-        [tr],
-        stages=stages,
-        start_date=datetime(2021, 3, 15),
-        end_date=datetime(2021, 3, 16)
-    )
+    cf = CumulativeFlow([tr], stages=stages, start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 16))
 
     df = cf.get_data_frame()
     print(df.to_csv())
@@ -257,8 +273,7 @@ def test_cumulative_flow_additive(stages):
 
 
 def test_cumulative_flow_counts_last_daily(stages):
-    """Test that 2 events added on same day == last occuring event of the day.
-    """
+    """Test that 2 events added on same day == last occuring event of the day."""
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
 
     test_data = [
@@ -287,8 +302,7 @@ def test_cumulative_flow_counts_last_daily(stages):
 
 
 def test_cumulative_flow_reports_days_from_today(stages, fake_timestamp, patch_datetime_now):
-    """Tests the default behavior calculating backwards by days, including today.
-    """
+    """Tests the default behavior calculating backwards by days, including today."""
 
     # fake_timestamp is the ending date
     test_data = [
@@ -454,13 +468,9 @@ def test_cumulative_flow_filtered_labels_do_not_affect_count_of_columns():
 
     # we did not request todo or review items from the list of available transition labels
     with pytest.raises(KeyError):
-        df[
-            "todo"
-        ].array  # todo occurs on 1st date, making opened count zero but todo is not shown
+        df["todo"].array  # todo occurs on 1st date, making opened count zero but todo is not shown
     with pytest.raises(KeyError):
-        df[
-            "review"
-        ].array  # review occurs on 3rd date, making inprogress count zero but review is not shown
+        df["review"].array  # review occurs on 3rd date, making inprogress count zero but review is not shown
 
     assert all([a == b for a, b in zip(df["opened"].array, [1, 0, 0, 0, 0])])
     assert all([a == b for a, b in zip(df["inprogress"].array, [0, 1, 0, 0, 0])])
@@ -581,7 +591,7 @@ def test_cumulative_flow_opened_ends_at_next_filtered_stage():
         {"datetime": openedAt, "opened": 1},
         {"datetime": datetime(2021, 3, 17, 7, tzinfo=timezone.utc), "opened": 0, "todo": 1},
         {"datetime": datetime(2021, 3, 18, 15, tzinfo=timezone.utc), "todo": 0, "inprogress": 1},
-        {"datetime": closedAt, "inprogress": 0, "closed": 1}
+        {"datetime": closedAt, "inprogress": 0, "closed": 1},
     ]
 
     data = pd.DataFrame.from_records(test_data, index=["datetime"])
@@ -656,9 +666,7 @@ def test_cumulative_flow_shows_hanging_open(stages):
 
 
 def test_leadcycletimes_should_be_additive(stages):
-    """ Lead and cycle times count days between opened, in progress, and closed.
-
-    """
+    """Lead and cycle times count days between opened, in progress, and closed."""
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
     inProgressAt = openedAt + timedelta(days=2)
     closedAt = datetime(2021, 3, 18, 21, tzinfo=timezone.utc)
@@ -674,15 +682,12 @@ def test_leadcycletimes_should_be_additive(stages):
     data = pd.DataFrame.from_records(test_data, index=["datetime"])
     tr = SimpleNamespace(data=data)
     lct = LeadCycleTimes(
-        [tr],
-        cycletime_label="inprogress",
-        start_date=datetime(2021, 3, 15),
-        end_date=datetime(2021, 3, 19)
+        [tr], cycletime_label="inprogress", start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 19)
     )
     df = lct.get_data_frame()
     print(df.to_csv())
-    expected_lead = closedAt-openedAt
-    expected_cycle = closedAt-inProgressAt
+    expected_lead = closedAt - openedAt
+    expected_cycle = closedAt - inProgressAt
     print(expected_lead, expected_cycle)
     assert all([a == b for a, b in zip(df["lead"].array, [expected_lead])])
     assert all([a == b for a, b in zip(df["cycle"].array, [expected_cycle])])
@@ -690,7 +695,7 @@ def test_leadcycletimes_should_be_additive(stages):
 
 @pytest.mark.skip(reason="not implemented")
 def test_leadcycletimes_rolling_should_be_additive(stages):
-    """ Lead and cycle times count days between opened, in progress, and closed.
+    """Lead and cycle times count days between opened, in progress, and closed.
 
     The rolling window prints the mean average of time.
     """
@@ -718,15 +723,12 @@ def test_leadcycletimes_rolling_should_be_additive(stages):
     data = pd.DataFrame.from_records(test_datas, index=["datetime"])
     tr = SimpleNamespace(data=data)
     lct = LeadCycleTimes(
-        [tr],
-        cycletime_label="inprogress",
-        start_date=datetime(2021, 3, 15),
-        end_date=datetime(2021, 3, 19)
+        [tr], cycletime_label="inprogress", start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 19)
     )
     df = lct.get_data_frame()
     print(df.to_csv())
-    expected_lead = closedAt-openedAt
-    expected_cycle = closedAt-inProgressAt
+    expected_lead = closedAt - openedAt
+    expected_cycle = closedAt - inProgressAt
     print(expected_lead, expected_cycle)
     assert all([a == b for a, b in zip(df["lead"].array, [expected_lead])])
     assert all([a == b for a, b in zip(df["cycle"].array, [expected_cycle])])

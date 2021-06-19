@@ -3,7 +3,7 @@ import pytest
 
 import pandas as pd
 
-from tests import change_directory, read_filepath
+from tests import change_directory, read_filepath, records
 
 from gl_analytics.__main__ import Main
 from gl_analytics.__main__ import build_transitions
@@ -14,19 +14,10 @@ def test_build_transitions_from_issues():
 
     created_at = datetime(2021, 3, 13, 10, tzinfo=timezone.utc)
 
-    test_data0 = [
-        {"datetime": created_at, "project": 2, "id": 1, "type": None, "opened": 1},
-        {"datetime": datetime(2021, 3, 14, 10, tzinfo=timezone.utc), "project": 2, "id": 1, "type": None, "opened": 0, "ready": 1},
-        {"datetime": datetime(2021, 3, 15, 10, tzinfo=timezone.utc), "project": 2, "id": 1, "type": None, "ready": 0, "in progress": 1},
-        {"datetime": datetime(2021, 3, 16, 10, tzinfo=timezone.utc), "project": 2, "id": 1, "type": None, "in progress": 0, "done": 1},
-    ]
-    test_data1 = [
-        {"datetime": created_at, "project": 2, "id": 2, "type": None, "opened": 1},
-        {"datetime": datetime(2021, 3, 14, 10, tzinfo=timezone.utc), "project": 2, "id": 2, "type": None, "opened": 0, "ready": 1},
-        {"datetime": datetime(2021, 3, 15, 10, tzinfo=timezone.utc), "project": 2, "id": 2, "type": None, "ready": 0, "in progress": 1},
-        {"datetime": datetime(2021, 3, 16, 10, tzinfo=timezone.utc), "project": 2, "id": 2, "type": None, "in progress": 0, "done": 1},
-    ]
-
+    test_data0 = list(records(2, 1, created_at, steps=["ready", "in progress", "done"]))
+    print(test_data0)
+    test_data1 = list(records(2, 2, created_at, steps=["ready", "in progress", "done"]))
+    print(test_data1)
     expected0 = pd.DataFrame.from_records(test_data0, index=["datetime"])
     expected1 = pd.DataFrame.from_records(test_data1, index=["datetime"])
 

@@ -14,7 +14,6 @@ from .report import CsvReport, PlotReport
 from .utils import timer
 from .config import load_config
 
-logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 # logging.getLogger('gl_analytics.utils').setLevel(logging.DEBUG)
 
@@ -153,4 +152,5 @@ class Main:
             print(f"Created '{outfile}'.")
 
 if __name__ == "__main__":  # pragma: no cover
+    logging.basicConfig()
     Main(args=sys.argv[1:]).run()

@@ -34,7 +34,7 @@ class PlotReport:
     """Configure the output of a DataFrame to plot image (.png).
     """
 
-    def __init__(self, df, file=None, title="CFD", ylimit=False, **kwargs):
+    def __init__(self, df, file=None, title="CFD", **kwargs):
         """Prepare a plot file.
 
         This is no more than a convenience wrapper to Pandas DataFrame API.
@@ -43,18 +43,14 @@ class PlotReport:
         df - DataFrame (required)
         file - Write to given file path or open file buffer. Returns a string when None.
         title - Extra title, typically represents the search criteria, e.g. milestone name
-        ylimit - If True, limit the y-axis to total excluding the last category
         """
-        self._df = df[df.columns[::-1]]
+        self._df = df[df.columns[::-1]]  # reverse order of columns
         self._file = file
         self.title = " ".join([
             title,
             str(df.index.date[0]),
             str(df.index.date[-1])
         ])
-
-        last_col = df.columns.values[-1]
-        self.ylimit = df.drop(last_col, axis=1).sum(axis=1).max() if ylimit else False
 
     def export(self):
         plt.close("all")
@@ -65,9 +61,6 @@ class PlotReport:
             "ylabel": "Count of Issues",
             "xlabel": "Days"
         }
-
-        if self.ylimit:
-            args["ylim"] = (0, self.ylimit)
 
         ax = self._df.plot.area(**args)
         fig = ax.get_figure()
