@@ -51,6 +51,16 @@ class PlotReport:
             str(df.index.date[0]),
             str(df.index.date[-1])
         ])
+        self.min = self._calc_min(df)
+        self.max = self._calc_max(df)
+
+    def _calc_min(self, df):
+         _min = df[df.columns.values[-1]].min()
+         return _min - (_min%10)
+
+    def _calc_max(self, df):
+        _max = df.sum(axis=1).max()
+        return round(_max+5, -1)
 
     def export(self):
         plt.close("all")
@@ -59,7 +69,8 @@ class PlotReport:
             "title": self.title,
             "legend": "reverse",
             "ylabel": "Count of Issues",
-            "xlabel": "Days"
+            "xlabel": "Days",
+            "ylim": (self.min, self.max)
         }
 
         ax = self._df.plot.area(**args)

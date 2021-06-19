@@ -111,8 +111,8 @@ class GitlabIssuesRepository(AbstractRepository):
         params = {
             "pagination": "keyset",
             "scope": "all",
-            "state": "closed",
-            #  "milestone": self._milestone
+            "milestone": self._milestone
+            # cycletime should be calculated using "closed" filter
         }
         # print("built url:", url, file=sys.stderr)
         # print("built params:", params, file=sys.stderr)
