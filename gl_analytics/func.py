@@ -1,4 +1,3 @@
-
 def foldl(func, init, seq):
     if not seq:
         return init

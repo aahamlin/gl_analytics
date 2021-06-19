@@ -16,7 +16,7 @@ class IssueStageTransitions:
     Each row is indexed by "datetime".
     """
 
-    def __init__(self, issue, label_events=[]):
+    def __init__(self, issue):
 
         # XXX This could definitely be cleaned up by constructing the list of dicts more directly
 

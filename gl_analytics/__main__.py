@@ -8,11 +8,13 @@ import sys
 
 import datetime
 
+from .config import load_config
+from .func import foldl
 from .issues import GitlabSession, GitlabIssuesRepository, GitlabScopedLabelResolver
 from .metrics import IssueStageTransitions, CumulativeFlow, LeadCycleTimes
 from .report import CsvReport, PlotReport
 from .utils import timer
-from .config import load_config
+
 
 logging.getLogger().setLevel(logging.INFO)
 # logging.getLogger('gl_analytics.utils').setLevel(logging.DEBUG)
@@ -132,7 +134,8 @@ class Main:
         # grab all the transitions from the elements in the list
         with timer("Building data"):
             transitions = build_transitions(issues)
-            log.info(f"Identified {len(transitions)} transitions for {self.prog_args.milestone}")
+            total = foldl(lambda x, y: x + len(y.data), 0, transitions)
+            log.info(f"Identified {total} transitions for {self.prog_args.milestone}")
 
         with timer("Aggregations"):
             result = CumulativeFlow(transitions, stages=DEFAULT_SERIES, days=days)
