@@ -136,8 +136,8 @@ class Main:
             log.info(f"Identified {len(transitions)} transitions for {self.prog_args.milestone}")
 
         with timer("Aggregations"):
-            #cf = CumulativeFlow(transitions, stages=DEFAULT_SERIES, days=days)
-            result = LeadCycleTimes(transitions, cycletime_label="In Progress", days=days)
+            result = CumulativeFlow(transitions, stages=DEFAULT_SERIES, days=days)
+            #result = LeadCycleTimes(transitions, cycletime_label="In Progress", days=days)
 
         report_cls, default_file = self.supported_reports[self.prog_args.report]
         report = report_cls(

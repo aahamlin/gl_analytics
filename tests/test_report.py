@@ -46,10 +46,10 @@ def test_plot_should_generate_title(filepath_png, df):
     assert report.title == f"{milestone} {start_date} {end_date}"
 
 
-def test_plot_should_impose_ylim_by_default(filepath_png, df):
+def test_plot_should_impose_ylim(filepath_png, df):
     # last category is an issue being "closed"
     df["closed"] = [1, 2, 3, 4, 5]
-    report = PlotReport(df, file=filepath_png.resolve())
+    report = PlotReport(df, file=filepath_png.resolve(), ylimit=True)
     # max sum of columns _not_ including closed in test data frame
     assert report.ylimit == 4
 

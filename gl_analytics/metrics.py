@@ -20,7 +20,7 @@ class IssueStageTransitions:
 
         # XXX This could definitely be cleaned up by constructing the list of dicts more directly
 
-        print("Issue:", issue)
+        # print("Issue:", issue)
         issue_id = issue.issue_id
         opened = issue.opened_at
         closed = issue.closed_at
@@ -204,16 +204,16 @@ class LeadCycleTimes():
         self._data = foldl(partial(combine_by_cycles, cycletime_label), df, [a.data for a in transitions])
 
     def get_data_frame(self):
-        print("Data", self._data)
+        # print("Data", self._data)
         return self._data
 
 
 def combine_by_cycles(cycle_label, d1, d2):
     # only uses opened, closed, and In Progress.
-    print("Before:", d2)
-    print(f"Filter by {cycle_label}")
+    # print("Before:", d2)
+    # print(f"Filter by {cycle_label}")
     d2 = d2.filter(["opened", cycle_label, "closed"])
-    print("After:", d2)
+    # print("After:", d2)
     d2 = d2.replace(to_replace=0, value=np.nan)
     d2 = d2.dropna(how="all")
     d2 = d2.reset_index()
@@ -225,5 +225,5 @@ def combine_by_cycles(cycle_label, d1, d2):
         d2["lead"] = d2["datetime"]-d2["datetime"].shift(periods=2)
     d2 = d2.filter(["datetime", "closed", "lead", "cycle"]).dropna(how="any")
     d2 = d2.drop("closed", axis=1, errors="ignore")
-    print("\nnew data\n", d2.to_dict(orient="records"))
+    # print("\nnew data\n", d2.to_dict(orient="records"))
     return d1.append(d2.to_dict(orient="records"))

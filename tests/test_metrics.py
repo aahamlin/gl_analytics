@@ -35,17 +35,18 @@ def test_issue_stage_transitions_should_be_records():
     ]
 
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
+    issue = SimpleNamespace(issue_id=1, opened_at=openedAt, closed_at=None)
 
     test_data = [
-        {"datetime": openedAt, "opened": 1},
-        {"datetime": datetime(2021, 3, 14, 15, 15, tzinfo=timezone.utc), "opened": 0, "ready": 1},
-        {"datetime": datetime(2021, 3, 15, 10, tzinfo=timezone.utc), "ready": 0, "in progress": 1},
-        {"datetime": datetime(2021, 3, 16, 10, tzinfo=timezone.utc), "in progress": 0, "done": 1},
+        {"datetime": openedAt, "issue_id": 1, "opened": 1},
+        {"datetime": datetime(2021, 3, 14, 15, 15, tzinfo=timezone.utc), "issue_id": 1, "opened": 0, "ready": 1},
+        {"datetime": datetime(2021, 3, 15, 10, tzinfo=timezone.utc), "issue_id": 1, "ready": 0, "in progress": 1},
+        {"datetime": datetime(2021, 3, 16, 10, tzinfo=timezone.utc), "issue_id": 1, "in progress": 0, "done": 1},
     ]
 
     expected = pd.DataFrame.from_records(test_data, index=["datetime"])
     print(expected)
-    actual = IssueStageTransitions(openedAt, None, label_events=wfData)
+    actual = IssueStageTransitions(issue, label_events=wfData)
     print(actual.data)
     assert expected.equals(actual.data)
 
@@ -53,6 +54,7 @@ def test_issue_stage_transitions_should_be_records():
 def test_issue_transitions_should_end_labels_when_closed():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
     closedAt = datetime(2021, 3, 18, tzinfo=timezone.utc)
+    issue = SimpleNamespace(issue_id=1, opened_at=openedAt, closed_at=closedAt)
 
     wfData = [
         (
@@ -68,54 +70,57 @@ def test_issue_transitions_should_end_labels_when_closed():
     ]
 
     test_data = [
-        {"datetime": openedAt, "opened": 1},
-        {"datetime": openedAt + timedelta(days=1), "opened": 0, "todo": 1},
-        {"datetime": openedAt + timedelta(days=2), "todo": 0, "done": 1},
-        {"datetime": closedAt, "done": 0, "closed": 1},
+        {"datetime": openedAt, "issue_id": 1, "opened": 1},
+        {"datetime": openedAt + timedelta(days=1), "issue_id": 1, "opened": 0, "todo": 1},
+        {"datetime": openedAt + timedelta(days=2), "issue_id": 1, "todo": 0, "done": 1},
+        {"datetime": closedAt, "issue_id": 1, "done": 0, "closed": 1},
     ]
 
     expected = pd.DataFrame.from_records(test_data, index=["datetime"])
-    actual = IssueStageTransitions(openedAt, closed=closedAt, label_events=wfData)
+    actual = IssueStageTransitions(issue, label_events=wfData)
     assert expected.equals(actual.data)
 
 
 def test_issue_transitions_should_end_open_when_closed():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
     closedAt = datetime(2021, 3, 18, tzinfo=timezone.utc)
+    issue = SimpleNamespace(issue_id=1, opened_at=openedAt, closed_at=closedAt)
 
     test_data = [
-        {"datetime": openedAt, "opened": 1},
-        {"datetime": closedAt, "opened": 0, "closed": 1},
+        {"datetime": openedAt, "issue_id": 1, "opened": 1},
+        {"datetime": closedAt, "issue_id": 1, "opened": 0, "closed": 1},
     ]
 
     expected = pd.DataFrame.from_records(test_data, index=["datetime"])
-    actual = IssueStageTransitions(openedAt, closed=closedAt, label_events=[])
+    actual = IssueStageTransitions(issue, label_events=[])
     assert expected.equals(actual.data)
 
 
 def test_issue_transitions_should_open_indefinitely():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
+    issue = SimpleNamespace(issue_id=1, opened_at=openedAt, closed_at=None)
 
     test_data = [
-        {"datetime": openedAt, "opened": 1},
+        {"datetime": openedAt, "issue_id": 1, "opened": 1},
     ]
 
     expected = pd.DataFrame.from_records(test_data, index=["datetime"])
-    actual = IssueStageTransitions(openedAt, label_events=[])
+    actual = IssueStageTransitions(issue, label_events=[])
     assert expected.equals(actual.data)
 
 
 def test_issue_transitions_should_provide_str():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
     closedAt = datetime(2021, 3, 18, tzinfo=timezone.utc)
+    issue = SimpleNamespace(issue_id=1, opened_at=openedAt, closed_at=closedAt)
 
     test_data = [
-        {"datetime": openedAt, "opened": 1},
-        {"datetime": closedAt, "opened": 0, "closed": 1},
+        {"datetime": openedAt, "issue_id": 1, "opened": 1},
+        {"datetime": closedAt, "issue_id": 1, "opened": 0, "closed": 1},
     ]
 
     expected = pd.DataFrame.from_records(test_data, index=["datetime"])
-    actual = IssueStageTransitions(openedAt, closed=closedAt, label_events=[])
+    actual = IssueStageTransitions(issue, label_events=[])
     assert str(expected) == str(actual)
 
 
@@ -715,7 +720,7 @@ def test_leadcycletimes_rolling_should_be_additive(stages):
 
     data = pd.DataFrame.from_records(test_datas, index=["datetime"])
     tr = SimpleNamespace(data=data)
-    lct = LeadCycleRollingAverage(
+    lct = LeadCycleTimes(
         [tr],
         cycletime_label="inprogress",
         start_date=datetime(2021, 3, 15),
