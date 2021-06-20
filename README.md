@@ -5,13 +5,6 @@ The GitLab product has an open [issue](https://gitlab.com/gitlab-org/gitlab/-/is
 Using the GitLab [resource state events](https://docs.gitlab.com/ee/api/resource_state_events.html) API we should be able to build
 a tool to access the state events necessary to build a CFD from the ~workflow labels used on our Kanban board.
 
-**Questions**
-
-- Should the reports always show every stage of the workflow (e.g. scope of label "workflow::*")?
-  Presently, you can filter out individual steps of the workflow (such as, Needs Design). Either,
-  this label should _not_ be included in the workflow scope or, if its included and filtered out,
-  the report should always count the last known step (in our case "opened")?
-
 ## Usage
 
 No installer yet.
@@ -22,24 +15,10 @@ $ pipenv run python -m gl_analytics --milestone mb_v1.3 --days 30
 ```
 
 
-
 ## Todos
 
-- Create installable (setup.cfg or newer toml format?)
-- Add output/export class(es) for generating Images, CSV, etc
+- Create installable (pyproject.toml)
 - Refactor areas marked with XXX comments
-- generating plot images directly, rather than importing CSV into a spreadsheet
-
-Work in Progress: Using `matplotlib` to product images directly. Given a DataFrame `df`, generating a diagram and saving
-to a file is straight forward.
-
-```
-    import matplotlib.pyplot as plt
-    plt.close("all")
-    ax = df.plot.area()
-    fig = ax.get_figure()
-    fig.savefig('output.png')
-```
 
 ## Create personal access token
 
