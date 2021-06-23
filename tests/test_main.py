@@ -137,3 +137,19 @@ def test_main_cumulative_flow_exports_default_png(monkeypatch, tmp_path, fake_ti
 
     timestamp_str = fake_timestamp.strftime("%Y%m%d_%H%M%S")
     assert tmp_path.joinpath(f"cfd_{timestamp_str}.png").exists()
+
+
+def test_cycletime_requires_user_token(monkeypatch):
+    main = Main(["cycletime", "-m", "mb_v1.3"])
+    monkeypatch.delitem(main.config, "TOKEN")
+
+    with pytest.raises(KeyError):
+        main.run()
+
+
+def test_cycletime_must_find_base_url(monkeypatch):
+    main = Main(["cy", "-m", "mb_v1.3"])
+    monkeypatch.delitem(main.config, "GITLAB_BASE_URL", raising=True)
+
+    with pytest.raises(KeyError):
+        main.run()
