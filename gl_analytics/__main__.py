@@ -26,6 +26,8 @@ DEFAULT_SERIES = [
     "closed",
 ]
 
+DEFAULT_PIVOT="In Progress"
+
 def create_parser(config):
 
     parser = argparse.ArgumentParser(
@@ -99,7 +101,7 @@ def create_parser(config):
         parents=[common_parser],
         help="Generate cumulative flow data in the given report format."
     )
-    cumulative_flow_parser.set_defaults(func=CumulativeFlow)
+    cumulative_flow_parser.set_defaults(func=CumulativeFlow, tag=DEFAULT_SERIES)
 
     cycletime_parser = subparsers.add_parser(
         "cycletime",
@@ -107,7 +109,7 @@ def create_parser(config):
         parents=[common_parser],
         help="Generate cycletime data in the given report format."
     )
-    cycletime_parser.set_defaults(func=LeadCycleTimes)
+    cycletime_parser.set_defaults(func=LeadCycleTimes, tag=DEFAULT_PIVOT)
 
     return parser
 
@@ -161,7 +163,7 @@ class Main:
             log.info(f"Identified {total} transitions for {self.prog_args.milestone}")
 
         with timer("Aggregations"):
-            result = self.prog_args.func(transitions, stages=DEFAULT_SERIES, days=days)
+            result = self.prog_args.func(transitions, tag=self.prog_args.tag, days=days)
             #result = LeadCycleTimes(transitions, cycletime_label="In Progress", days=days)
 
         report_cls, default_file = self.supported_reports[self.prog_args.report]

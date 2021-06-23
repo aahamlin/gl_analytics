@@ -153,3 +153,22 @@ def test_cycletime_must_find_base_url(monkeypatch):
 
     with pytest.raises(KeyError):
         main.run()
+
+
+@pytest.mark.usefixtures("get_issues")
+@pytest.mark.usefixtures("get_workflow_labels")
+def test_cycletime_prints_csv(capsys, monkeypatch, patch_datetime_now):
+    """Test that the main function runs without error.
+    """
+    main = Main(["cy", "-m", "mb_v1.3", "-r", "csv"])
+    monkeypatch.setitem(main.config, "TOKEN", "x")
+
+    capsys.readouterr()
+    main.run()
+    captured = capsys.readouterr()
+    print("\noutput captured\n", captured.out)
+    assert (
+        ",opened,In Progress,Code Review,closed"
+        in captured.out
+    )
+    assert "2021-03-07,0.0,1.0,0.0,0.0" in captured.out

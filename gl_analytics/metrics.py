@@ -87,8 +87,8 @@ class IssueStageTransitions:
 class CumulativeFlow(object):
     def __init__(
         self,
-        issues_stage_transitions,
-        stages=["opened", "closed"],
+        transitions,
+        tag=["opened", "closed"],
         days=30,
         end_date=None,
         start_date=None,
@@ -105,14 +105,14 @@ class CumulativeFlow(object):
         start_date provide a specific start date, default 30 days before end_date (inclusive)
         """
         self._index_daterange = _calculate_date_range(days, start_date, end_date)
-        self._labels = stages
+        self._labels = tag
 
         cats = pd.Series(
             pd.Categorical(self._labels, categories=self._labels, ordered=True)
         )
 
         df = pd.DataFrame([], index=self._index_daterange, columns=cats)
-        self._data = foldl(combine_by_totals, df, [a.data for a in issues_stage_transitions])
+        self._data = foldl(combine_by_totals, df, [a.data for a in transitions])
 
     @property
     def included_dates(self):
@@ -199,7 +199,7 @@ class LeadCycleTimes():
     def __init__(
         self,
             transitions,
-            cycletime_label=None,
+            tag=None,
             days=30,
             end_date=None,
             start_date=None
@@ -212,7 +212,7 @@ class LeadCycleTimes():
         self._labels = ["datetime", "lead", "cycle", "open", "wip", "project", "id", "type"]
 
         df = pd.DataFrame([], columns=self._labels)
-        self._data = foldl(partial(combine_by_cycles, cycletime_label), df, [a.data for a in transitions])
+        self._data = foldl(partial(combine_by_cycles, tag), df, [a.data for a in transitions])
 
     def get_data_frame(self):
         # print("Data", self._data)
@@ -237,5 +237,5 @@ def combine_by_cycles(cycle_label, d1, d2):
 
     d2 = d2.filter(["datetime", "closed", "lead", "cycle", "open", "wip", "project", "id", "type"]).dropna(how="any")
     # d2 = d2.drop("closed", axis=1, errors="ignore")
-    print("\nnew data\n", d2)
+    # print("\nnew data\n", d2)
     return d1.append(d2)
