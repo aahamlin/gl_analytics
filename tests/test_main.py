@@ -57,7 +57,7 @@ def test_build_transitions_from_issues():
 
 
 def test_main_require_user_token(monkeypatch):
-    main = Main(["-m", "mb_v1.3"])
+    main = Main(["cumulativeflow", "-m", "mb_v1.3"])
     monkeypatch.delitem(main.config, "TOKEN")
 
     with pytest.raises(KeyError):
@@ -65,7 +65,7 @@ def test_main_require_user_token(monkeypatch):
 
 
 def test_main_must_find_base_url(monkeypatch):
-    main = Main(["-m", "mb_v1.3"])
+    main = Main(["flow", "-m", "mb_v1.3"])
     monkeypatch.delitem(main.config, "GITLAB_BASE_URL", raising=True)
 
     with pytest.raises(KeyError):
@@ -77,7 +77,7 @@ def test_main_must_find_base_url(monkeypatch):
 def test_main_cumulative_flow_prints_csv(capsys, monkeypatch, patch_datetime_now):
     """Test that the main function runs without error.
     """
-    main = Main(["-m", "mb_v1.3", "-r", "csv"])
+    main = Main(["cf", "-m", "mb_v1.3", "-r", "csv"])
     monkeypatch.setitem(main.config, "TOKEN", "x")
 
     capsys.readouterr()
@@ -97,7 +97,7 @@ def test_main_cumulative_flow_writes_csv(filepath_csv, monkeypatch, patch_dateti
     """Test that the main function runs without error.
     """
     str_filepath = str(filepath_csv.resolve())
-    main = Main(["-m", "mb_v1.3", "-r", "csv", "-o", str_filepath])
+    main = Main(["cf", "-m", "mb_v1.3", "-r", "csv", "-o", str_filepath])
     monkeypatch.setitem(main.config, "TOKEN", "x")
 
     main.run()
@@ -117,7 +117,7 @@ def test_main_cumulative_flow_exports_png(monkeypatch, filepath_png):
 
     str_filepath = str(filepath_png.resolve())
     print(f"export to {str_filepath}")
-    main = Main(["-m", "mb_v1.3", "-r", "plot", "-o", str_filepath])
+    main = Main(["cf", "-m", "mb_v1.3", "-r", "plot", "-o", str_filepath])
     monkeypatch.setitem(main.config, "TOKEN", "x")
 
     main.run()
@@ -131,7 +131,7 @@ def test_main_cumulative_flow_exports_default_png(monkeypatch, tmp_path, fake_ti
     """Test that the main function runs without error.
     """
     with change_directory(tmp_path):
-        main = Main(["-m", "mb_v1.3", "-r", "plot"])
+        main = Main(["cf", "-m", "mb_v1.3", "-r", "plot"])
         monkeypatch.setitem(main.config, "TOKEN", "x")
         main.run()
 

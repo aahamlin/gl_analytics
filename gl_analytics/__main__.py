@@ -33,7 +33,9 @@ def create_parser(config):
         description="Analyze data from GitLab projects"
     )
 
-    parser.add_argument(
+    common_parser = argparse.ArgumentParser(add_help=False)
+
+    common_parser.add_argument(
         "-m",
         "--milestone",
         metavar="milestone",
@@ -42,7 +44,7 @@ def create_parser(config):
         help="Milestone id, e.g. mb_v1.3 or #started"
     )
 
-    parser.add_argument(
+    common_parser.add_argument(
         "-d",
         "--days",
         metavar="days",
@@ -60,7 +62,7 @@ def create_parser(config):
     #     default=DEFAULT_SERIES
     # )
 
-    parser.add_argument(
+    common_parser.add_argument(
         "-g",
         "--group",
         metavar="group",
@@ -69,7 +71,7 @@ def create_parser(config):
         help="GitLab Group name, default %s"%config.get("GITLAB_GROUP")
     )
 
-    parser.add_argument(
+    common_parser.add_argument(
         "-r",
         "--report",
         choices=["csv", "plot"],
@@ -77,7 +79,7 @@ def create_parser(config):
         help="Specify output report type"
     )
 
-    parser.add_argument(
+    common_parser.add_argument(
         "-o",
         "--outfile",
         metavar="Filepath",
@@ -85,6 +87,27 @@ def create_parser(config):
         default=None,
         help="File to output or default"
     )
+
+    subparsers = parser.add_subparsers(
+        title="Available commands",
+        description="Commands to analyze GitLab Issue metrics.",
+    )
+
+    cumulative_flow_parser = subparsers.add_parser(
+        "cumulativeflow",
+        aliases=["cf", "flow"],
+        parents=[common_parser],
+        help="Generate cumulative flow data in the given report format."
+    )
+    cumulative_flow_parser.set_defaults(func=CumulativeFlow)
+
+    cycletime_parser = subparsers.add_parser(
+        "cycletime",
+        aliases=["cy"],
+        parents=[common_parser],
+        help="Generate cycletime data in the given report format."
+    )
+    cycletime_parser.set_defaults(func=LeadCycleTimes)
 
     return parser
 
@@ -138,7 +161,7 @@ class Main:
             log.info(f"Identified {total} transitions for {self.prog_args.milestone}")
 
         with timer("Aggregations"):
-            result = CumulativeFlow(transitions, stages=DEFAULT_SERIES, days=days)
+            result = self.prog_args.func(transitions, stages=DEFAULT_SERIES, days=days)
             #result = LeadCycleTimes(transitions, cycletime_label="In Progress", days=days)
 
         report_cls, default_file = self.supported_reports[self.prog_args.report]
