@@ -88,7 +88,7 @@ class CumulativeFlow(object):
     def __init__(
         self,
         transitions,
-        tag=["opened", "closed"],
+        stages=["opened", "closed"],
         days=30,
         end_date=None,
         start_date=None,
@@ -105,7 +105,7 @@ class CumulativeFlow(object):
         start_date provide a specific start date, default 30 days before end_date (inclusive)
         """
         self._index_daterange = _calculate_date_range(days, start_date, end_date)
-        self._labels = tag
+        self._labels = stages
 
         cats = pd.Series(
             pd.Categorical(self._labels, categories=self._labels, ordered=True)
@@ -199,7 +199,7 @@ class LeadCycleTimes():
     def __init__(
         self,
             transitions,
-            tag=None,
+            stage=None,
             days=30,
             end_date=None,
             start_date=None
@@ -212,7 +212,7 @@ class LeadCycleTimes():
         self._labels = ["datetime", "type", "lead", "cycle"]
 
         df = pd.DataFrame([], columns=self._labels)
-        self._data = foldl(partial(combine_by_cycles, tag), df, [a.data for a in transitions])
+        self._data = foldl(partial(combine_by_cycles, stage), df, [a.data for a in transitions])
 
     def get_data_frame(self):
         # print("Data", self._data)

@@ -149,38 +149,38 @@ def test_issue_transitions_should_provide_str():
 
 def test_workflow_requires_date_object_for_start(stages):
     with pytest.raises(ValueError):
-        CumulativeFlow([], tag=stages, start_date="2021-03-10T12:00:00.000Z")
+        CumulativeFlow([], stages=stages, start_date="2021-03-10T12:00:00.000Z")
 
 
 def test_workflow_supports_datetime_for_start_date(stages):
     expected = datetime(2021, 3, 10, 12, tzinfo=timezone.utc)
-    cf = CumulativeFlow([], tag=stages, start_date=expected, days=1)
+    cf = CumulativeFlow([], stages=stages, start_date=expected, days=1)
     assert cf.included_dates.size == 1
     cf.included_dates.values == [expected]
 
 
 def test_workflow_supports_datetime_for_end_date(stages):
     expected = datetime(2021, 3, 10, 12, tzinfo=timezone.utc)
-    cf = CumulativeFlow([], tag=stages, end_date=expected, days=1)
+    cf = CumulativeFlow([], stages=stages, end_date=expected, days=1)
     assert cf.included_dates.size == 1
     cf.included_dates.values == [expected]
 
 
 def test_workflow_requires_date_object_for_end(stages):
     with pytest.raises(ValueError):
-        CumulativeFlow([], tag=stages, end_date="2021-03-10T12:00:00.000Z")
+        CumulativeFlow([], stages=stages, end_date="2021-03-10T12:00:00.000Z")
 
 
 def test_workflow_enforces_one_day_minimum(stages):
     with pytest.raises(ValueError):
-        CumulativeFlow([], tag=stages, days=0)
+        CumulativeFlow([], stages=stages, days=0)
     with pytest.raises(ValueError):
-        CumulativeFlow([], tag=stages, days=-1)
+        CumulativeFlow([], stages=stages, days=-1)
 
 
 def test_workflow_honors_today_with_days(stages, fake_timestamp, patch_datetime_now):
     # use fake_timestamp and datetime monkeypatch
-    cf = CumulativeFlow([], tag=stages, days=5)
+    cf = CumulativeFlow([], stages=stages, days=5)
     fiveDaysAgo = fake_timestamp - timedelta(days=4)
     assert cf.included_dates.size == 5
     values = cf.included_dates.values
@@ -189,7 +189,7 @@ def test_workflow_honors_today_with_days(stages, fake_timestamp, patch_datetime_
 
 
 def test_cumulative_flow_should_default_30days(stages):
-    cf = CumulativeFlow([], tag=stages, end_date=datetime(2021, 3, 30))
+    cf = CumulativeFlow([], stages=stages, end_date=datetime(2021, 3, 30))
     assert cf.included_dates.size == 30
     values = cf.included_dates.values
     assert values[-1] == np.datetime64(datetime(2021, 3, 30))
@@ -199,7 +199,7 @@ def test_cumulative_flow_should_default_30days(stages):
 def test_cumulative_flow_should_generate_date_range(stages):
     cf = CumulativeFlow(
         [],
-        tag=stages,
+        stages=stages,
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 19),
     )
@@ -219,7 +219,7 @@ def test_cumulative_flow_counts_forward(stages):
 
     data = pd.DataFrame.from_records(test_data, index=["datetime"])
     tr = SimpleNamespace(data=data)
-    cf = CumulativeFlow([tr], tag=stages, start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 16))
+    cf = CumulativeFlow([tr], stages=stages, start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 16))
     df = cf.get_data_frame()
     print(df.to_csv())
     assert all([a == b for a, b in zip(df["todo"].array, [1, 0])])
@@ -238,7 +238,7 @@ def test_cumulative_flow_counts_backwards(stages):
     data = pd.DataFrame.from_records(test_data, index=["datetime"])
     tr = SimpleNamespace(data=data)
 
-    cf = CumulativeFlow([tr], tag=stages, start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 16))
+    cf = CumulativeFlow([tr], stages=stages, start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 16))
 
     df = cf.get_data_frame()
     print(df.to_csv())
@@ -261,7 +261,7 @@ def test_cumulative_flow_additive(stages):
     print("\ntransitions", tr)
     cf = CumulativeFlow(
         [tr, tr],
-        tag=stages,
+        stages=stages,
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 16),
     )
@@ -288,7 +288,7 @@ def test_cumulative_flow_counts_last_daily(stages):
 
     cf = CumulativeFlow(
         [tr],
-        tag=stages,
+        stages=stages,
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 16),
     )
@@ -318,7 +318,7 @@ def test_cumulative_flow_reports_days_from_today(stages, fake_timestamp, patch_d
 
     cf = CumulativeFlow(
         [tr],
-        tag=stages,
+        stages=stages,
         days=5,
     )
 
@@ -344,7 +344,7 @@ def test_cumulative_flow_first_label_occurs_before_time_window(stages):
 
     cf = CumulativeFlow(
         [tr],
-        tag=stages,
+        stages=stages,
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 18),
     )
@@ -370,7 +370,7 @@ def test_cumulative_flow_stage_ends_when_closed(stages):
 
     cf = CumulativeFlow(
         [tr],
-        tag=stages,
+        stages=stages,
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 20),
     )
@@ -394,7 +394,7 @@ def test_cumulative_flow_reports_open_closed(stages):
     series1 = ["opened"] + stages + ["closed"]
     cf = CumulativeFlow(
         [tr],
-        tag=series1,
+        stages=series1,
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 19),
     )
@@ -423,7 +423,7 @@ def test_cumulative_flow_created_to_closed_same_day(stages):
     series1 = ["opened"] + stages + ["closed"]
     cf = CumulativeFlow(
         [tr],
-        tag=series1,
+        stages=series1,
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 19),
     )
@@ -459,7 +459,7 @@ def test_cumulative_flow_filtered_labels_do_not_affect_count_of_columns():
 
     cf = CumulativeFlow(
         [tr],
-        tag=series1,
+        stages=series1,
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 19),
     )
@@ -498,7 +498,7 @@ def test_cumulative_flow_accounts_for_filtered_stages():
 
     cf = CumulativeFlow(
         [tr],
-        tag=series1,
+        stages=series1,
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 19),
     )
@@ -536,8 +536,8 @@ def test_cumulative_flow_offsets_for_closed_stages():
 
     cf = CumulativeFlow(
         [tr],
-        # workflow_tag=["open", "todo", "inprogress", "review", "done", "closed"],
-        tag=["done"],
+        # workflow_stages=["open", "todo", "inprogress", "review", "done", "closed"],
+        stages=["done"],
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 19),
     )
@@ -567,7 +567,7 @@ def test_cumulative_flow_offsets_for_filtered_stages():
 
     cf = CumulativeFlow(
         [tr],
-        tag=["inprogress"],
+        stages=["inprogress"],
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 19),
     )
@@ -599,7 +599,7 @@ def test_cumulative_flow_opened_ends_at_next_filtered_stage():
 
     cf = CumulativeFlow(
         [tr],
-        tag=["opened", "inprogress"],
+        stages=["opened", "inprogress"],
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 19),
     )
@@ -631,7 +631,7 @@ def test_cumulative_flow_label_removed_but_not_closed(stages):
     series = ["opened"] + stages + ["closed"]
     cf = CumulativeFlow(
         [tr],
-        tag=series,
+        stages=series,
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 19),
     )
@@ -655,7 +655,7 @@ def test_cumulative_flow_shows_hanging_open(stages):
 
     cf = CumulativeFlow(
         [tr],
-        tag=series,
+        stages=series,
         start_date=datetime(2021, 3, 17),
         end_date=datetime(2021, 3, 19),
     )
@@ -682,7 +682,7 @@ def test_leadcycletimes_should_be_additive(stages):
     data = pd.DataFrame.from_records(test_data, index=["datetime"])
     tr = SimpleNamespace(data=data)
     lct = LeadCycleTimes(
-        [tr], tag="inprogress", start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 19)
+        [tr], stage="inprogress", start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 19)
     )
     df = lct.get_data_frame()
     print(df.to_csv())
@@ -723,7 +723,7 @@ def test_leadcycletimes_rolling_should_be_additive(stages):
     data = pd.DataFrame.from_records(test_datas, index=["datetime"])
     tr = SimpleNamespace(data=data)
     lct = LeadCycleTimes(
-        [tr], tag="inprogress", start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 19)
+        [tr], stage="inprogress", start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 19)
     )
     df = lct.get_data_frame()
     print(df.to_csv())
