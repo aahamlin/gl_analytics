@@ -168,7 +168,6 @@ def test_cycletime_prints_csv(capsys, monkeypatch, patch_datetime_now):
     captured = capsys.readouterr()
     print("\noutput captured\n", captured.out)
     assert (
-        ",opened,In Progress,Code Review,closed"
+        "datetime,type,lead,cycle"
         in captured.out
     )
-    assert "2021-03-07,0.0,1.0,0.0,0.0" in captured.out

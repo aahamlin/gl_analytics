@@ -209,7 +209,7 @@ class LeadCycleTimes():
 
         # XXX not sure how to use the data range
         self._index_daterange = _calculate_date_range(days, start_date, end_date)
-        self._labels = ["datetime", "lead", "cycle", "open", "wip", "project", "id", "type"]
+        self._labels = ["datetime", "type", "lead", "cycle"]
 
         df = pd.DataFrame([], columns=self._labels)
         self._data = foldl(partial(combine_by_cycles, tag), df, [a.data for a in transitions])
@@ -221,7 +221,7 @@ class LeadCycleTimes():
 
 def combine_by_cycles(cycle_label, d1, d2):
     # only uses opened, closed, and In Progress.
-    d2 = d2.filter(["opened", cycle_label, "closed", "project", "id", "type"])
+    d2 = d2.filter(["opened", cycle_label, "closed", "type"])
     d2 = d2.replace(to_replace=0, value=np.nan)
     d2 = d2.dropna(how="all")
     d2 = d2.reset_index()
@@ -235,7 +235,7 @@ def combine_by_cycles(cycle_label, d1, d2):
     d2["open"] = open_date
     d2["wip"] = wip_date
 
-    d2 = d2.filter(["datetime", "closed", "lead", "cycle", "open", "wip", "project", "id", "type"]).dropna(how="any")
+    d2 = d2.filter(d1.columns.values).dropna(how="any")
     # d2 = d2.drop("closed", axis=1, errors="ignore")
     # print("\nnew data\n", d2)
     return d1.append(d2)
