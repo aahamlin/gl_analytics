@@ -3,20 +3,10 @@
 """
 import argparse
 import logging
-
 import sys
 
-import datetime
-
-from collections import namedtuple
-from types import SimpleNamespace
-
 from .config import load_config
-from .issues import GitlabSession, GitlabIssuesRepository, GitlabScopedLabelResolver, GitLabStateEventResolver
-from .metrics import CumulativeFlow, LeadCycleTimes, build_transitions
-from .report import CsvReport, PlotReport
-from .utils import timer
-
+from .command import CumulativeFlowCommand, CycleTimeCommand
 
 logging.getLogger().setLevel(logging.INFO)
 # logging.getLogger('gl_analytics.utils').setLevel(logging.DEBUG)
@@ -30,6 +20,9 @@ DEFAULT_SERIES = [
 ]
 
 DEFAULT_PIVOT = "In Progress"
+
+
+log = logging.getLogger("main")
 
 
 def create_parser(config):
@@ -73,8 +66,9 @@ def create_parser(config):
     )
 
     subparsers = parser.add_subparsers(
-        title="Available commands", description="Commands to analyze GitLab Issue metrics.", dest="subparser_name"
+        title="Available commands", description="Commands to analyze GitLab Issue metrics.", dest="command"
     )
+    subparsers.required = True
 
     cumulative_flow_parser = subparsers.add_parser(
         "cumulativeflow",
@@ -87,7 +81,7 @@ def create_parser(config):
         "-d", "--days", metavar="days", type=int, nargs="?", default=30, help="Number of days to analyze, default 30"
     )
 
-    cumulative_flow_parser.set_defaults(func=cumulative_flow_factory, extra_args=dict(stages=DEFAULT_SERIES))
+    cumulative_flow_parser.set_defaults(func=CumulativeFlowCommand, extra_args=dict(stages=DEFAULT_SERIES))
 
     cycletime_parser = subparsers.add_parser(
         "cycletime",
@@ -95,94 +89,20 @@ def create_parser(config):
         parents=[common_parser],
         help="Generate cycletime data in the given report format.",
     )
-    cycletime_parser.set_defaults(func=cycle_time_factory, extra_args=dict(stage=DEFAULT_PIVOT))
+    cycletime_parser.set_defaults(func=CycleTimeCommand, extra_args=dict(stage=DEFAULT_PIVOT))
 
     return parser
-
-
-def cumulative_flow_factory(session, args):
-    repository = GitlabIssuesRepository(
-        session,
-        group=args.group,
-        milestone=args.milestone,
-        resolvers=[GitlabScopedLabelResolver, GitLabStateEventResolver],
-    )
-    return repository, cumulative_flow_cls_factory
-
-
-def cumulative_flow_cls_factory(issues, *args, **kwargs):
-    transitions = build_transitions(issues)
-    return CumulativeFlow(transitions, *args, **kwargs)
-
-
-def cycle_time_factory(session, args):
-    repository = GitlabIssuesRepository(
-        session,
-        group=args.group,
-        milestone=args.milestone,
-        state="closed",
-        resolvers=[GitlabScopedLabelResolver, GitLabStateEventResolver],
-    )
-    return repository, cycle_time_cls_factory
-
-
-def cycle_time_cls_factory(issues, *args, **kwargs):
-    # TODO: eliminate the need for transitions here
-    return LeadCycleTimes(issues, *args, **kwargs)
 
 
 class Main:
     def __init__(self, args=None):
         self.config = load_config()
-
         parser = create_parser(self.config)
-        self.prog_args = parser.parse_args(args)
-
-        timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.supported_reports = {
-            "csv": (CsvReport, sys.stdout),
-            "plot": (PlotReport, f"cfd_{timestamp_str}.png"),
-        }
+        prog_args = parser.parse_args(args)
+        self.cmd = prog_args.func(self.config, prog_args)
 
     def run(self):
-        token = self.config["TOKEN"]
-        baseurl = self.config["GITLAB_BASE_URL"]
-        session = GitlabSession(baseurl, access_token=token)
-        QueryArgs = namedtuple("QueryArgs", ["group", "milestone"])
-        query_args = QueryArgs(group=self.prog_args.group, milestone=self.prog_args.milestone)
-        ReportArgs = namedtuple("ReportArgs", ["report", "outfile"])
-        report_args = ReportArgs(report=self.prog_args.report, outfile=self.prog_args.outfile)
-
-        repository, aggregator_cls = self.prog_args.func(session, query_args)
-
-        # create a simple dictionary with the rest of the argparser arguments to pass to the aggregator class
-        aggregator_args = {
-            k: v
-            for k, v in self.prog_args.__dict__.items()
-            if k not in query_args._asdict() and k not in report_args._asdict() and k != "extra_args"
-        }
-        aggregator_args.update(self.prog_args.extra_args)
-        # print(f"built args for aggregator class {aggregator_cls} {aggregator_args}")
-
-        log = logging.getLogger("main")
-
-        with timer("Listing issues"):
-            issues = repository.list()
-            log.info(f"Retrieved {len(issues)} issues for {query_args.milestone}")
-
-        with timer("Aggregations"):
-            result = aggregator_cls(issues, **aggregator_args)
-
-        report_cls, default_file = self.supported_reports[report_args.report]
-        report = report_cls(
-            result.get_data_frame(), file=(report_args.outfile or default_file), title=query_args.milestone
-        )
-
-        with timer("Export"):
-            report.export()
-
-        if report_args.outfile:
-            print(f"Created '{report_args.outfile}'.")
+        self.cmd.execute()
 
 
 if __name__ == "__main__":  # pragma: no cover
