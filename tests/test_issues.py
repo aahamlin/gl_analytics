@@ -1,28 +1,10 @@
+# from types import SimpleNamespace
 import pytest
 import datetime
 
 from dateutil.utils import within_delta
 
 import gl_analytics.issues as issues
-
-
-def test_issues_error():
-    assert isinstance(issues.IssuesError(), Exception)
-
-
-def test_abstract_session():
-    with pytest.raises(issues.IssuesError):
-        issues.Session().get()
-
-
-def test_abstract_repository():
-    with pytest.raises(issues.IssuesError):
-        issues.AbstractRepository().list()
-
-
-def test_abstract_resolver():
-    with pytest.raises(issues.IssuesError):
-        issues.AbstractResolver().resolve()
 
 
 def test_gitlab_session(session):
@@ -51,38 +33,29 @@ def test_gitlab_session_requires_relative_path(session, requests_mock):
         session.get("/groups/gozynta/issues")
 
 
-def test_repo_requires_group_and_milestone():
+def test_repo_requires_group(session):
     with pytest.raises(ValueError):
-        issues.GitlabIssuesRepository(issues.Session(), milestone="foo")
-    with pytest.raises(ValueError):
-        issues.GitlabIssuesRepository(issues.Session(), group="foo")
+        issues.GitlabIssuesRepository(session)
+
+
+def test_repo_builds_url(session):
+    repo = issues.GitlabIssuesRepository(session, group="gozynta")
+    assert repo.url == "groups/gozynta/issues"
 
 
 @pytest.mark.usefixtures("get_paged_issues")
-def test_repo_list_pagination(session, requests_mock):
+def test_repo_list_pagination(session):
     """Make sure we page correctly.
 
     The GitLab API, when using the pagination=keyset parameter, returns the pages referenced
     as first, next, last via the link response header.
     """
-    repo = issues.GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3")
-    issue_list = repo.list()
+    repo = issues.GitlabIssuesRepository(session, group="gozynta")
+    issue_list = repo.list(milestone="mb_v1.3")
 
     assert len(issue_list) == 2
     assert issue_list[0] and issue_list[0].issue_id == 2
     assert issue_list[1] and issue_list[1].issue_id == 3
-
-
-@pytest.mark.parametrize(
-    "state,expected_url",
-    [
-        (None, "groups/gozynta/issues?pagination=keyset&scope=all&milestone=mb_v1.3"),
-        ("closed", "groups/gozynta/issues?pagination=keyset&scope=all&milestone=mb_v1.3&state=closed"),
-    ],
-)
-def test_repo_builds_url(state, expected_url, session):
-    repo = issues.GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3", state=state)
-    assert repo.url == expected_url
 
 
 def compare_label_events(expected, actual):
@@ -101,11 +74,11 @@ def test_scopelabelresolver_includes_qualifying_events(session):
     repo = issues.GitlabIssuesRepository(
         session,
         group="gozynta",
-        milestone="mb_v1.3",
         resolvers=[issues.GitlabScopedLabelResolver],
     )
 
     expected_labels = [
+        ("opened", datetime.datetime(2021, 2, 9, 12, 59, 43, tzinfo=datetime.timezone.utc), None),
         (
             "Designing",
             datetime.datetime(2021, 2, 9, 16, 59, 37, 783, tzinfo=datetime.timezone.utc),
@@ -118,12 +91,13 @@ def test_scopelabelresolver_includes_qualifying_events(session):
         ),
     ]
 
-    issue_list = repo.list()
+    issue_list = repo.list(milestone="mb_v1.3")
     assert len(issue_list) == 1
 
     the_issue = issue_list[0]
-    assert len(the_issue.label_events) == 2  # designing, in progress
-    assert all(compare_label_events(a, b) for a, b in zip(expected_labels, the_issue.label_events))
+    assert len(the_issue.history) == 3  # designing, in progress
+    print(the_issue.history)
+    assert all(compare_label_events(a, b) for a, b in zip(expected_labels, the_issue.history))
 
 
 @pytest.mark.usefixtures("get_issues")
@@ -133,33 +107,33 @@ def test_scopedlabelresolver_skips_non_qualifying_events(session):
     repo = issues.GitlabIssuesRepository(
         session,
         group="gozynta",
-        milestone="mb_v1.3",
         resolvers=[issues.GitlabScopedLabelResolver],
     )
 
     expected_labels = [
+        ("opened", datetime.datetime(2021, 2, 9, 12, 59, 43, tzinfo=datetime.timezone.utc), None),
         (
             "Designing",
             datetime.datetime(2021, 2, 9, 16, 59, 37, 783, tzinfo=datetime.timezone.utc),
             datetime.datetime(2021, 2, 9, 17, 0, 49, 416, tzinfo=datetime.timezone.utc),
-        )
+        ),
     ]
 
-    issue_list = repo.list()
+    issue_list = repo.list(milestone="mb_v1.3")
 
     assert len(issue_list) == 1
 
     the_issue = issue_list[0]
-    assert len(the_issue.label_events) == 1  # designing
+    assert len(the_issue.history) == 2  # opened, designing
 
-    assert compare_label_events(expected_labels[0], the_issue.label_events[0])
+    assert compare_label_events(expected_labels[1], the_issue.history[1])
 
 
 @pytest.mark.usefixtures("get_issues_with_label")
 def test_issue_with_typelabel_should_set_type(session):
-    repo = issues.GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3")
+    repo = issues.GitlabIssuesRepository(session, group="gozynta")
 
-    results = repo.list()
+    results = repo.list(milestone="mb_v1.3")
     assert len(results) == 1
     the_issue = results[0]
     assert the_issue.issue_type == "Bug"
@@ -167,9 +141,9 @@ def test_issue_with_typelabel_should_set_type(session):
 
 @pytest.mark.usefixtures("get_issues")
 def test_issue_without_typelabel_should_not_set_type(session):
-    repo = issues.GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3")
+    repo = issues.GitlabIssuesRepository(session, group="gozynta")
 
-    results = repo.list()
+    results = repo.list(milestone="mb_v1.3")
     assert len(results) == 1
     the_issue = results[0]
     assert the_issue.issue_type is None

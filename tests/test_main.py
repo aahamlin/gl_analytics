@@ -1,55 +1,13 @@
-from datetime import datetime, timezone
 import pytest
 
-import pandas as pd
-
-from tests import change_directory, read_filepath, records
+from tests import change_directory, read_filepath
 
 from gl_analytics.__main__ import Main
-from gl_analytics.__main__ import build_transitions
-from gl_analytics.issues import Issue
 
 
-def test_build_transitions_from_issues():
-
-    created_at = datetime(2021, 3, 13, 10, tzinfo=timezone.utc)
-
-    test_data0 = list(records(2, 1, created_at, steps=["ready", "in progress", "done"]))
-    print(test_data0)
-    test_data1 = list(records(2, 2, created_at, steps=["ready", "in progress", "done"]))
-    print(test_data1)
-    expected0 = pd.DataFrame.from_records(test_data0, index=["datetime"])
-    expected1 = pd.DataFrame.from_records(test_data1, index=["datetime"])
-
-    wfData = [
-        (
-            "ready",
-            datetime(2021, 3, 14, 10, tzinfo=timezone.utc),
-            datetime(2021, 3, 15, 10, tzinfo=timezone.utc),
-        ),
-        (
-            "in progress",
-            datetime(2021, 3, 15, 10, tzinfo=timezone.utc),
-            datetime(2021, 3, 16, 10, tzinfo=timezone.utc),
-        ),
-        ("done", datetime(2021, 3, 16, 10, tzinfo=timezone.utc), None),
-    ]
-
-    issues = [
-        Issue(1, 2, created_at, label_events=wfData),
-        Issue(2, 2, created_at, label_events=wfData),
-    ]
-
-    transitions = build_transitions(issues)
-
-    print(expected0)
-    print(expected1)
-    assert len(transitions) == 2
-    print(transitions[0])
-    print(transitions[1])
-
-    assert all([expected0.equals(transitions[0].data)])
-    assert all([expected1.equals(transitions[1].data)])
+def test_main_require_command():
+    with pytest.raises(SystemExit):
+        Main([])
 
 
 def test_main_require_user_token(monkeypatch):
@@ -153,6 +111,6 @@ def test_cycletime_prints_csv(capsys, monkeypatch, patch_datetime_now):
     captured = capsys.readouterr()
     print("\noutput captured\n", captured.out)
     assert (
-        ",id,project,type,opened,In Progress,closed,lead,cycle\n0,2,8273019,,2021-03-09,2021-03-12,2021-03-15,5,2"
-        in captured.out
-    )
+        ",id,project,type,opened,In Progress,closed,last_closed,reopened,lead,cycle\n"
+        + "0,2,8273019,,2021-03-09,2021-03-12,2021-03-15,2021-03-15,0,5,2"
+    ) in captured.out

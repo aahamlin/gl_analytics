@@ -1,5 +1,12 @@
 # Design notes
 
+Refactor 03 Aug 2021:
+
+- IssueStageTransitions. This class only applies to the CumulativeFlow.
+- Create static method on CumulativeFlow to transform the issues
+- Add parallel processing using ThreadPool or ProcessPool
+- Change CycleTime to use different format than CumulativeFlow
+
 ## Command design classes
 
 Need to run different commands, cumulative flow versus cycletime, which may have different sets of options.

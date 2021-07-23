@@ -19,6 +19,7 @@ $ pipenv run python -m gl_analytics --milestone mb_v1.3 --days 30
 
 - Create installable (pyproject.toml)
 - Refactor areas marked with XXX comments
+- Add column to cycletime, indicating whether the WIP label existed (if not, we use opened date)
 
 ## Create personal access token
 
