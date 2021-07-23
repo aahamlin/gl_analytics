@@ -14,6 +14,14 @@ class IssueStageTransitions:
     """Creates a DataFrame holding all stages of a single Issue through a workflow.
 
     Each row is indexed by "datetime".
+
+    Example:
+                               project  id type  opened  ready  in progress  done
+    datetime                                                                     
+    2021-03-14 12:00:00+00:00        2   1  Bug     1.0    NaN          NaN   NaN
+    2021-03-14 15:15:00+00:00        2   1  Bug     0.0    1.0          NaN   NaN
+    2021-03-15 10:00:00+00:00        2   1  Bug     NaN    0.0          1.0   NaN
+    2021-03-16 10:00:00+00:00        2   1  Bug     NaN    NaN          0.0   1.0
     """
 
     def __init__(self, issue):
@@ -207,12 +215,15 @@ class LeadCycleTimes():
         """Generate lead & cycle time values from issue transitions.
         """
 
-        # XXX not sure how to use the data range
-        self._index_daterange = _calculate_date_range(days, start_date, end_date)
-        self._labels = ["datetime", "type", "lead", "cycle"]
+        # we could generate a business day range by passing freq='B' into date_range calculation.
 
-        df = pd.DataFrame([], columns=self._labels)
-        self._data = foldl(partial(combine_by_cycles, stage), df, [a.data for a in transitions])
+        # XXX not sure how to use the data range?
+        self._index_daterange = _calculate_date_range(days, start_date, end_date)
+        df = pd.DataFrame([])
+        df = foldl(partial(combine_by_cycles, stage), df, [a.data for a in transitions])
+        df['lead'] = [x + 1 for x in np.busday_count(df['opened'].values.astype('datetime64[D]'), df['closed'].values.astype('datetime64[D]'))]
+        df['cycle'] = [x + 1 for x in np.busday_count(df[stage].values.astype('datetime64[D]'), df['closed'].values.astype('datetime64[D]'))]
+        self._data = df
 
     def get_data_frame(self):
         # print("Data", self._data)
@@ -221,21 +232,28 @@ class LeadCycleTimes():
 
 def combine_by_cycles(cycle_label, d1, d2):
     # only uses opened, closed, and In Progress.
-    d2 = d2.filter(["opened", cycle_label, "closed", "type"])
-    d2 = d2.replace(to_replace=0, value=np.nan)
-    d2 = d2.dropna(how="all")
-    d2 = d2.reset_index()
-    # d2.columns = ["datetime", "lead", "cycle", "closed"]
-    wip_date = d2["datetime"].shift()
-    open_date = wip_date if cycle_label not in d2 else d2["datetime"].shift(periods=2)
+    print(d2)
+    tmp = d2.filter(["opened", cycle_label, "closed"])
+    tmp = tmp.replace(to_replace=0, value=np.nan)
+    tmp = tmp.dropna(how="all")
+    print(tmp)
 
-    d2["cycle"] = d2["datetime"]-wip_date
-    d2["lead"] = d2["datetime"]-open_date
+    # wip equals open if not present
+    wip_index = 0 if cycle_label not in tmp else 1
 
-    d2["open"] = open_date
-    d2["wip"] = wip_date
+    open_date = tmp.index[0]
+    wip_date = tmp.index[wip_index]
+    closed_date = tmp.index[2]
 
-    d2 = d2.filter(d1.columns.values).dropna(how="any")
-    # d2 = d2.drop("closed", axis=1, errors="ignore")
-    # print("\nnew data\n", d2)
-    return d1.append(d2)
+    row = {
+        "id": d2["id"][0],
+        "project": d2["project"][0],
+        "type": d2["type"][0]
+    }
+    row["opened"] = open_date
+    row[cycle_label] = wip_date
+    row["closed"] = closed_date
+    #d2 = d2.filter(d1.columns.values).dropna(how="any")
+    #d2.reset_index()
+    print("\nnew data\n", row)
+    return d1.append(pd.DataFrame.from_records([row]))

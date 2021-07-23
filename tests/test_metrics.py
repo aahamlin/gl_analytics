@@ -667,68 +667,48 @@ def test_cumulative_flow_shows_hanging_open(stages):
 
 def test_leadcycletimes_should_be_additive(stages):
     """Lead and cycle times count days between opened, in progress, and closed."""
-    openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
+
+    data = pd.DataFrame.from_records(get_item_over_week(), index=["datetime"])
+    item1 = SimpleNamespace(data=data)
+
+    data = pd.DataFrame.from_records(get_item_over_weekend(), index=["datetime"])
+    item2 = SimpleNamespace(data=data)
+
+    lct = LeadCycleTimes(
+        [item1, item2], stage="inprogress", start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 19)
+    )
+    df = lct.get_data_frame()
+    print(df.to_csv())
+    assert all([a == b for a, b in zip(df["lead"].array, [5, 4])])
+    assert all([a == b for a, b in zip(df["cycle"].array, [3, 2])])
+
+
+def get_item_over_week():
+    openedAt = datetime(2021, 3, 15, 6, tzinfo=timezone.utc)
     inProgressAt = openedAt + timedelta(days=2)
-    closedAt = datetime(2021, 3, 18, 21, tzinfo=timezone.utc)
+    closedAt = datetime(2021, 3, 19, 21, tzinfo=timezone.utc)
 
     test_data = [
-        {"datetime": openedAt, "opened": 1},
-        {"datetime": openedAt + timedelta(days=1), "opened": 0, "todo": 1},
-        {"datetime": inProgressAt, "todo": 0, "inprogress": 1},
-        {"datetime": openedAt + timedelta(days=3), "inprogress": 0, "review": 1},
-        {"datetime": closedAt, "review": 0, "closed": 1},
+        {"datetime": openedAt, "project": 1, "id": 1, "type": "bug", "opened": 1},
+        {"datetime": openedAt + timedelta(days=1), "project": 1, "id": 1, "type": "bug", "opened": 0, "todo": 1},
+        {"datetime": inProgressAt, "project": 1, "id": 1, "type": "bug", "todo": 0, "inprogress": 1},
+        {"datetime": openedAt + timedelta(days=3), "project": 1, "id": 1, "type": "bug", "inprogress": 0, "review": 1},
+        {"datetime": closedAt, "project": 1, "id": 1, "type": "bug", "review": 0, "closed": 1},
     ]
-
-    data = pd.DataFrame.from_records(test_data, index=["datetime"])
-    tr = SimpleNamespace(data=data)
-    lct = LeadCycleTimes(
-        [tr], stage="inprogress", start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 19)
-    )
-    df = lct.get_data_frame()
-    print(df.to_csv())
-    expected_lead = closedAt - openedAt
-    expected_cycle = closedAt - inProgressAt
-    print(expected_lead, expected_cycle)
-    assert all([a == b for a, b in zip(df["lead"].array, [expected_lead])])
-    assert all([a == b for a, b in zip(df["cycle"].array, [expected_cycle])])
+    return test_data
 
 
-@pytest.mark.skip(reason="not implemented")
-def test_leadcycletimes_rolling_should_be_additive(stages):
-    """Lead and cycle times count days between opened, in progress, and closed.
-
-    The rolling window prints the mean average of time.
-    """
-    openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
+def get_item_over_weekend():
+    """Lead and cycle times count days between opened, in progress, and closed."""
+    openedAt = datetime(2021, 3, 18, 6, tzinfo=timezone.utc)  # Thursday
     inProgressAt = openedAt + timedelta(days=2)
-    closedAt = datetime(2021, 3, 18, 21, tzinfo=timezone.utc)
+    closedAt = datetime(2021, 3, 23, 21, tzinfo=timezone.utc)  # Tuesday
 
-    openedAt2 = datetime(2021, 3, 16, 12, tzinfo=timezone.utc)
-    inProgressAt2 = openedAt2 + timedelta(days=1)
-    closedAt2 = openedAt2 + timedelta(days=2)
-
-    test_datas = [
-        [
-            {"datetime": openedAt, "opened": 1},
-            {"datetime": inProgressAt, "todo": 0, "inprogress": 1},
-            {"datetime": closedAt, "review": 0, "closed": 1},
-        ],
-        [
-            {"datetime": openedAt2, "opened": 1},
-            {"datetime": inProgressAt2, "todo": 0, "inprogress": 1},
-            {"datetime": closedAt2, "review": 0, "closed": 1},
-        ],
+    test_data = [
+        {"datetime": openedAt, "project": 1, "id": 2, "type": "bug", "opened": 1},
+        {"datetime": openedAt + timedelta(days=1), "project": 1, "id": 2, "type": "bug", "opened": 0, "todo": 1},
+        {"datetime": inProgressAt, "project": 1, "id": 2, "type": "bug", "todo": 0, "inprogress": 1},
+        {"datetime": openedAt + timedelta(days=3), "project": 1, "id": 2, "type": "bug", "inprogress": 0, "review": 1},
+        {"datetime": closedAt, "project": 1, "id": 2, "type": "bug", "review": 0, "closed": 1},
     ]
-
-    data = pd.DataFrame.from_records(test_datas, index=["datetime"])
-    tr = SimpleNamespace(data=data)
-    lct = LeadCycleTimes(
-        [tr], stage="inprogress", start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 19)
-    )
-    df = lct.get_data_frame()
-    print(df.to_csv())
-    expected_lead = closedAt - openedAt
-    expected_cycle = closedAt - inProgressAt
-    print(expected_lead, expected_cycle)
-    assert all([a == b for a, b in zip(df["lead"].array, [expected_lead])])
-    assert all([a == b for a, b in zip(df["cycle"].array, [expected_cycle])])
+    return test_data
