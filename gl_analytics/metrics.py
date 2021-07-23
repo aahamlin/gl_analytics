@@ -17,7 +17,7 @@ class IssueStageTransitions:
 
     Example:
                                project  id type  opened  ready  in progress  done
-    datetime                                                                     
+    datetime
     2021-03-14 12:00:00+00:00        2   1  Bug     1.0    NaN          NaN   NaN
     2021-03-14 15:15:00+00:00        2   1  Bug     0.0    1.0          NaN   NaN
     2021-03-15 10:00:00+00:00        2   1  Bug     NaN    0.0          1.0   NaN
@@ -54,10 +54,19 @@ class IssueStageTransitions:
             opened_end = None
 
         def to_record(label, start, end):
-            yield dict(zip([index_name, project_name, id_name, type_name, label], [start, project_id, issue_id, issue_type, 1]))
+            yield dict(
+                zip(
+                    [index_name, project_name, id_name, type_name, label], [start, project_id, issue_id, issue_type, 1]
+                )
+            )
 
             if end:
-                yield dict(zip([index_name, project_name, id_name, type_name, label], [end, project_id, issue_id, issue_type, 0]))
+                yield dict(
+                    zip(
+                        [index_name, project_name, id_name, type_name, label],
+                        [end, project_id, issue_id, issue_type, 0],
+                    )
+                )
 
         transitions = []
 
@@ -115,9 +124,7 @@ class CumulativeFlow(object):
         self._index_daterange = _calculate_date_range(days, start_date, end_date)
         self._labels = stages
 
-        cats = pd.Series(
-            pd.Categorical(self._labels, categories=self._labels, ordered=True)
-        )
+        cats = pd.Series(pd.Categorical(self._labels, categories=self._labels, ordered=True))
 
         df = pd.DataFrame([], index=self._index_daterange, columns=cats)
         self._data = foldl(combine_by_totals, df, [a.data for a in transitions])
@@ -129,8 +136,7 @@ class CumulativeFlow(object):
         return self._index_daterange
 
     def get_data_frame(self):
-        """Build a DataFrame for processing (metrics, plotting, etc).
-        """
+        """Build a DataFrame for processing (metrics, plotting, etc)."""
         return self._data
 
 
@@ -153,35 +159,18 @@ def _calculate_date_range(days, start_date, end_date):
     pd_date_range = partial(pd.date_range, freq="D", name="datetime", tz="UTC")
 
     if end_date and start_date:
-        return pd_date_range(
-            start=start_date,
-            end=end_date
-        )
+        return pd_date_range(start=start_date, end=end_date)
     elif start_date:
-        return pd_date_range(
-            start=start_date,
-            periods=days
-        )
+        return pd_date_range(start=start_date, periods=days)
 
-    end_date = (
-        end_date
-        if end_date
-        else datetime.datetime.now(datetime.timezone.utc).date()
-    )
-    return pd_date_range(
-        end=end_date,
-        periods=days
-    )
+    end_date = end_date if end_date else datetime.datetime.now(datetime.timezone.utc).date()
+    return pd_date_range(end=end_date, periods=days)
 
 
 def dt_index_shift(r):
-    """If last row sum == 0 return index of row else None
-    """
-    return (
-        r.iloc[-1].name
-        if not r.dropna().empty and 0 == r.iloc[-1].sum()
-        else None
-    )
+    """If last row sum == 0 return index of row else None"""
+    return r.iloc[-1].name if not r.dropna().empty and 0 == r.iloc[-1].sum() else None
+
 
 def combine_by_totals(d1, d2):
     d2 = d2.reindex(columns=d1.columns)
@@ -201,19 +190,11 @@ def combine_by_totals(d1, d2):
     return d1.combine(d2, np.add, fill_value=0)
 
 
-class LeadCycleTimes():
-    """Calculations for a scatter plot diagram.
-    """
-    def __init__(
-        self,
-            transitions,
-            stage=None,
-            days=30,
-            end_date=None,
-            start_date=None
-    ):
-        """Generate lead & cycle time values from issue transitions.
-        """
+class LeadCycleTimes:
+    """Calculations for a scatter plot diagram."""
+
+    def __init__(self, transitions, stage=None, days=30, end_date=None, start_date=None):
+        """Generate lead & cycle time values from issue transitions."""
 
         # we could generate a business day range by passing freq='B' into date_range calculation.
 
@@ -221,8 +202,18 @@ class LeadCycleTimes():
         self._index_daterange = _calculate_date_range(days, start_date, end_date)
         df = pd.DataFrame([])
         df = foldl(partial(combine_by_cycles, stage), df, [a.data for a in transitions])
-        df['lead'] = [x + 1 for x in np.busday_count(df['opened'].values.astype('datetime64[D]'), df['closed'].values.astype('datetime64[D]'))]
-        df['cycle'] = [x + 1 for x in np.busday_count(df[stage].values.astype('datetime64[D]'), df['closed'].values.astype('datetime64[D]'))]
+        df["lead"] = [
+            x + 1
+            for x in np.busday_count(
+                df["opened"].values.astype("datetime64[D]"), df["closed"].values.astype("datetime64[D]")
+            )
+        ]
+        df["cycle"] = [
+            x + 1
+            for x in np.busday_count(
+                df[stage].values.astype("datetime64[D]"), df["closed"].values.astype("datetime64[D]")
+            )
+        ]
         self._data = df
 
     def get_data_frame(self):
@@ -231,29 +222,21 @@ class LeadCycleTimes():
 
 
 def combine_by_cycles(cycle_label, d1, d2):
-    # only uses opened, closed, and In Progress.
-    print(d2)
     tmp = d2.filter(["opened", cycle_label, "closed"])
     tmp = tmp.replace(to_replace=0, value=np.nan)
     tmp = tmp.dropna(how="all")
-    print(tmp)
 
     # wip equals open if not present
     wip_index = 0 if cycle_label not in tmp else 1
 
     open_date = tmp.index[0]
     wip_date = tmp.index[wip_index]
-    closed_date = tmp.index[2]
+    closed_date = tmp.index[wip_index + 1]
 
-    row = {
-        "id": d2["id"][0],
-        "project": d2["project"][0],
-        "type": d2["type"][0]
-    }
+    row = {"id": d2["id"][0], "project": d2["project"][0], "type": d2["type"][0]}
     row["opened"] = open_date
     row[cycle_label] = wip_date
     row["closed"] = closed_date
-    #d2 = d2.filter(d1.columns.values).dropna(how="any")
-    #d2.reset_index()
-    print("\nnew data\n", row)
-    return d1.append(pd.DataFrame.from_records([row]))
+
+    df = pd.DataFrame.from_records([row])
+    return d1.append(df)

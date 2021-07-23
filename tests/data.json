@@ -11,11 +11,14 @@
     },
     "labeled": {
       "body": "[{\"id\":8000235, \"iid\":4,\"project_id\":\"8273019\",\"title\":\"test title 2\",\"created_at\":\"2021-03-09T17:59:43.041Z\",\"labels\":[\"type::Bug\"]}]"
+    },
+    "closed": {
+      "body": "[{\"id\":8000234,\"iid\":2,\"project_id\":\"8273019\",\"title\":\"test title\",\"created_at\":\"2021-03-09T17:59:43.041Z\", \"closed_at\":\"2021-03-15T12:00:00.000Z\"}]"
     }
-
   },
   "resource_label_events": {
     "stages": "[{\"created_at\": \"2021-02-09T16:59:37.783Z\",\"resource_type\": \"Issue\",\"label\":{\"id\": 18205357,\"name\": \"workflow::Designing\"},\"action\": \"add\"},{\"created_at\": \"2021-02-09T17:00:49.416Z\",\"resource_type\": \"Issue\",\"label\": {\"id\": 18205410,\"name\": \"workflow::In Progress\"},\"action\": \"add\"},{\"created_at\": \"2021-02-09T17:00:49.416Z\",\"resource_type\": \"Issue\",\"label\": {\"id\": 18205357,\"name\": \"workflow::Designing\"},\"action\": \"remove\"}]",
-    "excluded_stages": "[{\"created_at\": \"2021-02-09T16:59:37.783Z\",\"resource_type\": \"Issue\",\"label\":{\"id\": 18205357,\"name\": \"workflow::Designing\"},\"action\": \"add\"},{\"created_at\": \"2021-02-09T17:00:49.416Z\",\"resource_type\": \"Issue\",\"label\": {\"id\": 18205410,\"name\": \"NonQualifyingLabel\"},\"action\": \"add\"},{\"created_at\": \"2021-02-09T17:00:49.416Z\",\"resource_type\": \"Issue\",\"label\": {\"id\": 18205357,\"name\": \"workflow::Designing\"},\"action\": \"remove\"}]"
+    "excluded_stages": "[{\"created_at\": \"2021-02-09T16:59:37.783Z\",\"resource_type\": \"Issue\",\"label\":{\"id\": 18205357,\"name\": \"workflow::Designing\"},\"action\": \"add\"},{\"created_at\": \"2021-02-09T17:00:49.416Z\",\"resource_type\": \"Issue\",\"label\": {\"id\": 18205410,\"name\": \"NonQualifyingLabel\"},\"action\": \"add\"},{\"created_at\": \"2021-02-09T17:00:49.416Z\",\"resource_type\": \"Issue\",\"label\": {\"id\": 18205357,\"name\": \"workflow::Designing\"},\"action\": \"remove\"}]",
+    "closed": "[{\"created_at\": \"2021-03-10T16:59:37.783Z\",\"resource_type\": \"Issue\",\"label\":{\"id\": 18205357,\"name\": \"workflow::Designing\"},\"action\": \"add\"},{\"created_at\": \"2021-03-12T17:00:49.416Z\",\"resource_type\": \"Issue\",\"label\": {\"id\": 18205410,\"name\": \"workflow::In Progress\"},\"action\": \"add\"},{\"created_at\": \"2021-03-12T17:00:49.416Z\",\"resource_type\": \"Issue\",\"label\": {\"id\": 18205357,\"name\": \"workflow::Designing\"},\"action\": \"remove\"}]"
   }
 }

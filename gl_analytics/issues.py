@@ -1,6 +1,7 @@
 """ Issues module interacts with a backend system API, e.g. GitLab.
 """
 import sys
+import logging
 import requests
 
 from cachecontrol import CacheControlAdapter
@@ -11,6 +12,8 @@ from dateutil import parser as date_parser
 from urllib.parse import urlencode, urljoin
 
 from .func import foldl
+
+_log = logging.getLogger(__name__)
 
 
 class IssuesError(Exception):
@@ -73,13 +76,14 @@ class AbstractResolver(object):
 class GitlabIssuesRepository(AbstractRepository):
     """This is specifically a GitLab Issue repository. Current GitLab version is 13.11.0-pre."""
 
-    def __init__(self, session, group=None, milestone=None, resolvers=[]):
+    def __init__(self, session, group=None, milestone=None, state=None, resolvers=[]):
         """Initialize a repository.
 
         Required:
         session: session object
         group: group name or id
         milestone: milestone name or id
+        state: issue state filter, e.g. 'closed'
 
         Optional:
         resolvers: Specify classes to use to resolve additional fields.
@@ -90,6 +94,7 @@ class GitlabIssuesRepository(AbstractRepository):
         self._session = session
         self._group = group
         self._milestone = milestone
+        self._state = state
         self._resolvers = resolvers
 
         self._url = self._build_request_url()
@@ -108,14 +113,13 @@ class GitlabIssuesRepository(AbstractRepository):
 
         # XXX rebuild using sorted tuples for caching effectiveness
         # see also https://cachecontrol.readthedocs.io/en/latest/tips.html#query-string-params
-        params = {
-            "pagination": "keyset",
-            "scope": "all",
-            "milestone": self._milestone
-            # cycletime should be calculated using "closed" filter
-        }
-        # print("built url:", url, file=sys.stderr)
-        # print("built params:", params, file=sys.stderr)
+        params = {"pagination": "keyset", "scope": "all", "milestone": self._milestone}
+
+        if self._state:
+            params["state"] = self._state
+
+        _log.debug("built url: %s", url)
+        _log.debug("built params: %s", params)
         return "{0}?{1}".format(url, urlencode(params))
 
     def _page_results(self):
@@ -157,15 +161,11 @@ class GitlabIssuesRepository(AbstractRepository):
         closed_at = date_parser.parse(closed_at_str) if closed_at_str else None
         label_events = None
         issue_type = self._find_type_label(item)
-        issue = Issue(
-            issue_id, project_id, opened_at, closed_at=closed_at, issue_type=issue_type
-        )
+        issue = Issue(issue_id, project_id, opened_at, closed_at=closed_at, issue_type=issue_type)
         return issue
 
     def _find_type_label(self, item):
-        type_labels = [
-            t.lstrip("type::") for t in item.get("labels", []) if t.startswith("type::")
-        ][:1]
+        type_labels = [t.lstrip("type::") for t in item.get("labels", []) if t.startswith("type::")][:1]
         return type_labels[0] if type_labels else None
 
     def _resolve_fields(self, issue):
@@ -195,9 +195,7 @@ class GitlabScopedLabelResolver(AbstractResolver):
 
     def _build_request_url(self, project_id, issue_id):
         # /api/v4/projects/8279995/issues/191/resource_label_events
-        url = "projects/{0}/issues/{1}/resource_label_events".format(
-            project_id, issue_id
-        )
+        url = "projects/{0}/issues/{1}/resource_label_events".format(project_id, issue_id)
         return url
 
     def _fetch_results(self, url):

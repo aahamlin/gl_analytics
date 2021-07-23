@@ -80,6 +80,14 @@ def get_issues(requests_mock):
 
 
 @pytest.fixture
+def get_closed_issues(requests_mock):
+    requests_mock.get(
+        "https://gitlab.com/api/v4/groups/gozynta/issues",
+        body=to_bytes(TestData.issues.closed.body),
+    )
+
+
+@pytest.fixture
 def get_paged_issues(requests_mock):
     requests_mock.get(
         "https://gitlab.com/api/v4/groups/gozynta/issues",
@@ -98,6 +106,14 @@ def get_workflow_labels(requests_mock):
     requests_mock.get(
         "https://gitlab.com/api/v4/projects/8273019/issues/2/resource_label_events",
         body=to_bytes(TestData.resource_label_events.stages),
+    )
+
+
+@pytest.fixture
+def get_closed_workflow_labels(requests_mock):
+    requests_mock.get(
+        "https://gitlab.com/api/v4/projects/8273019/issues/2/resource_label_events",
+        body=to_bytes(TestData.resource_label_events.closed),
     )
 
 

@@ -73,7 +73,20 @@ def test_repo_list_pagination(session, requests_mock):
     assert issue_list[1] and issue_list[1].issue_id == 3
 
 
+@pytest.mark.parametrize(
+    "state,expected_url",
+    [
+        (None, "groups/gozynta/issues?pagination=keyset&scope=all&milestone=mb_v1.3"),
+        ("closed", "groups/gozynta/issues?pagination=keyset&scope=all&milestone=mb_v1.3&state=closed"),
+    ],
+)
+def test_repo_builds_url(state, expected_url, session):
+    repo = issues.GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3", state=state)
+    assert repo.url == expected_url
+
+
 def compare_label_events(expected, actual):
+    """Helper function for test asserts."""
     return (
         expected[0] == actual[0]
         and (expected[0] == actual[0] or within_delta(expected[1], actual[1], datetime.timedelta(seconds=1)))
@@ -95,9 +108,7 @@ def test_scopelabelresolver_includes_qualifying_events(session):
     expected_labels = [
         (
             "Designing",
-            datetime.datetime(
-                2021, 2, 9, 16, 59, 37, 783, tzinfo=datetime.timezone.utc
-            ),
+            datetime.datetime(2021, 2, 9, 16, 59, 37, 783, tzinfo=datetime.timezone.utc),
             datetime.datetime(2021, 2, 9, 17, 0, 49, 416, tzinfo=datetime.timezone.utc),
         ),
         (
@@ -129,9 +140,7 @@ def test_scopedlabelresolver_skips_non_qualifying_events(session):
     expected_labels = [
         (
             "Designing",
-            datetime.datetime(
-                2021, 2, 9, 16, 59, 37, 783, tzinfo=datetime.timezone.utc
-            ),
+            datetime.datetime(2021, 2, 9, 16, 59, 37, 783, tzinfo=datetime.timezone.utc),
             datetime.datetime(2021, 2, 9, 17, 0, 49, 416, tzinfo=datetime.timezone.utc),
         )
     ]
@@ -148,11 +157,7 @@ def test_scopedlabelresolver_skips_non_qualifying_events(session):
 
 @pytest.mark.usefixtures("get_issues_with_label")
 def test_issue_with_typelabel_should_set_type(session):
-    repo = issues.GitlabIssuesRepository(
-        session,
-        group="gozynta",
-        milestone="mb_v1.3"
-    )
+    repo = issues.GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3")
 
     results = repo.list()
     assert len(results) == 1
@@ -162,11 +167,7 @@ def test_issue_with_typelabel_should_set_type(session):
 
 @pytest.mark.usefixtures("get_issues")
 def test_issue_without_typelabel_should_not_set_type(session):
-    repo = issues.GitlabIssuesRepository(
-        session,
-        group="gozynta",
-        milestone="mb_v1.3"
-    )
+    repo = issues.GitlabIssuesRepository(session, group="gozynta", milestone="mb_v1.3")
 
     results = repo.list()
     assert len(results) == 1

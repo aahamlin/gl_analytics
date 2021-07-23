@@ -18,6 +18,7 @@ from .utils import timer
 
 logging.getLogger().setLevel(logging.INFO)
 # logging.getLogger('gl_analytics.utils').setLevel(logging.DEBUG)
+# logging.getLogger("gl_analytics.issues").setLevel(logging.DEBUG)
 
 DEFAULT_SERIES = [
     "opened",
@@ -26,14 +27,12 @@ DEFAULT_SERIES = [
     "closed",
 ]
 
-DEFAULT_PIVOT="In Progress"
+DEFAULT_PIVOT = "In Progress"
+
 
 def create_parser(config):
 
-    parser = argparse.ArgumentParser(
-        prog = "gl-analytics",
-        description="Analyze data from GitLab projects"
-    )
+    parser = argparse.ArgumentParser(prog="gl-analytics", description="Analyze data from GitLab projects")
 
     common_parser = argparse.ArgumentParser(add_help=False)
 
@@ -43,17 +42,11 @@ def create_parser(config):
         metavar="milestone",
         nargs="?",
         default="#started",
-        help="Milestone id, e.g. mb_v1.3 or #started"
+        help="Milestone id, e.g. mb_v1.3 or #started",
     )
 
     common_parser.add_argument(
-        "-d",
-        "--days",
-        metavar="days",
-        type=int,
-        nargs="?",
-        default=30,
-        help="Number of days to analyze, default 30"
+        "-d", "--days", metavar="days", type=int, nargs="?", default=30, help="Number of days to analyze, default 30"
     )
 
     # parser.add_argument(
@@ -70,36 +63,26 @@ def create_parser(config):
         metavar="group",
         nargs="?",
         default=config.get("GITLAB_GROUP"),
-        help="GitLab Group name, default %s"%config.get("GITLAB_GROUP")
+        help="GitLab Group name, default %s" % config.get("GITLAB_GROUP"),
     )
 
     common_parser.add_argument(
-        "-r",
-        "--report",
-        choices=["csv", "plot"],
-        default="csv",
-        help="Specify output report type"
+        "-r", "--report", choices=["csv", "plot"], default="csv", help="Specify output report type"
     )
 
     common_parser.add_argument(
-        "-o",
-        "--outfile",
-        metavar="Filepath",
-        nargs="?",
-        default=None,
-        help="File to output or default"
+        "-o", "--outfile", metavar="Filepath", nargs="?", default=None, help="File to output or default"
     )
 
     subparsers = parser.add_subparsers(
-        title="Available commands",
-        description="Commands to analyze GitLab Issue metrics.",
+        title="Available commands", description="Commands to analyze GitLab Issue metrics.", dest="subparser_name"
     )
 
     cumulative_flow_parser = subparsers.add_parser(
         "cumulativeflow",
         aliases=["cf", "flow"],
         parents=[common_parser],
-        help="Generate cumulative flow data in the given report format."
+        help="Generate cumulative flow data in the given report format.",
     )
     cumulative_flow_parser.set_defaults(func=CumulativeFlow, extra_args=dict(stages=DEFAULT_SERIES))
 
@@ -107,23 +90,19 @@ def create_parser(config):
         "cycletime",
         aliases=["cy"],
         parents=[common_parser],
-        help="Generate cycletime data in the given report format."
+        help="Generate cycletime data in the given report format.",
     )
     cycletime_parser.set_defaults(func=LeadCycleTimes, extra_args=dict(stage=DEFAULT_PIVOT))
 
     return parser
 
+
 def build_transitions(issues):
-    """Create a list of transitions from a list of issues.
-    """
-    return [
-        IssueStageTransitions(i)
-        for i in issues
-    ]
+    """Create a list of transitions from a list of issues."""
+    return [IssueStageTransitions(i) for i in issues]
 
 
 class Main:
-
     def __init__(self, args=None):
         self.config = load_config()
 
@@ -132,8 +111,8 @@ class Main:
 
         timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.supported_reports = {
-            'csv': (CsvReport, sys.stdout),
-            'plot': (PlotReport, f"cfd_{timestamp_str}.png"),
+            "csv": (CsvReport, sys.stdout),
+            "plot": (PlotReport, f"cfd_{timestamp_str}.png"),
         }
 
     def run(self):
@@ -143,10 +122,15 @@ class Main:
         days = self.prog_args.days
 
         session = GitlabSession(baseurl, access_token=token)
+
+        # TODO: change the parse func or the class so that individual aggregations can control the query parameters.
+        #  For example, the cycletime query should filter only Closed items, this needs to be available for the list
+        #  operation above. This will simplify things and allow removal of checking the subparser_name value.
         repository = GitlabIssuesRepository(
             session,
             group=self.prog_args.group,
             milestone=self.prog_args.milestone,
+            state="closed" if self.prog_args.subparser_name.startswith("cy") else None,
             resolvers=[GitlabScopedLabelResolver],
         )
 
@@ -164,20 +148,16 @@ class Main:
 
         with timer("Aggregations"):
             result = self.prog_args.func(transitions, days=days, **self.prog_args.extra_args)
-            #result = LeadCycleTimes(transitions, cycletime_label="In Progress", days=days)
 
         report_cls, default_file = self.supported_reports[self.prog_args.report]
-        report = report_cls(
-            result.get_data_frame(),
-            file=(outfile or default_file),
-            title=self.prog_args.milestone
-        )
+        report = report_cls(result.get_data_frame(), file=(outfile or default_file), title=self.prog_args.milestone)
 
         with timer("Export"):
             report.export()
 
         if outfile:
             print(f"Created '{outfile}'.")
+
 
 if __name__ == "__main__":  # pragma: no cover
     logging.basicConfig()
