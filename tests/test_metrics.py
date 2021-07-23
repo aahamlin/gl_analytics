@@ -1,16 +1,60 @@
 import pytest
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
 
-from types import SimpleNamespace
+from tests import records
 
-from gl_analytics.metrics import (
-    CumulativeFlow,
-    IssueStageTransitions,
-    LeadCycleTimes,
-)
+from gl_analytics.issues import Issue
+from gl_analytics.metrics import CumulativeFlow, IssueStageTransitions, LeadCycleTimes, build_transitions
+
+
+def test_build_transitions_from_issues():
+
+    created_at = datetime(2021, 3, 13, 10, tzinfo=timezone.utc)
+
+    test_data0 = list(records(2, 1, created_at, steps=["ready", "in progress", "done"]))
+    print(test_data0)
+    test_data1 = list(records(2, 2, created_at, steps=["ready", "in progress", "done"]))
+    print(test_data1)
+    expected0 = pd.DataFrame.from_records(test_data0, index=["datetime"])
+    expected1 = pd.DataFrame.from_records(test_data1, index=["datetime"])
+
+    wfData = [
+        (
+            "ready",
+            datetime(2021, 3, 14, 10, tzinfo=timezone.utc),
+            datetime(2021, 3, 15, 10, tzinfo=timezone.utc),
+        ),
+        (
+            "in progress",
+            datetime(2021, 3, 15, 10, tzinfo=timezone.utc),
+            datetime(2021, 3, 16, 10, tzinfo=timezone.utc),
+        ),
+        ("done", datetime(2021, 3, 16, 10, tzinfo=timezone.utc), None),
+    ]
+
+    issues = [
+        Issue(1, 2, created_at),
+        Issue(2, 2, created_at),
+    ]
+    issues[0].history.add_events(wfData)
+    issues[1].history.add_events(wfData)
+
+    transitions = build_transitions(issues)
+
+    assert len(transitions) == 2
+    print("expected vs actual")
+    print(expected0)
+    print(transitions[0])
+    print("expected vs actual")
+    print(expected1)
+    print(transitions[1])
+
+    assert all([expected0.equals(transitions[0].data)])
+    assert all([expected1.equals(transitions[1].data)])
 
 
 def test_issue_stage_transitions_should_be_records():
@@ -32,9 +76,8 @@ def test_issue_stage_transitions_should_be_records():
             None,
         ),
     ]
-    issue = SimpleNamespace(
-        issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=None, label_events=wfData
-    )
+    issue = Issue(1, 2, openedAt, issue_type="Bug")
+    issue.history.add_events(wfData)
 
     test_data = [
         {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
@@ -81,10 +124,10 @@ def test_issue_transitions_should_end_labels_when_closed():
             openedAt + timedelta(days=2),
             None,
         ),
+        ("closed", closedAt, None),
     ]
-    issue = SimpleNamespace(
-        issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=closedAt, label_events=wfData
-    )
+    issue = Issue(1, 2, openedAt, issue_type="Bug")
+    issue.history.add_events(wfData)
 
     test_data = [
         {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
@@ -94,16 +137,17 @@ def test_issue_transitions_should_end_labels_when_closed():
     ]
 
     expected = pd.DataFrame.from_records(test_data, index=["datetime"])
+    print(expected)
     actual = IssueStageTransitions(issue)
+    print(actual.data)
     assert expected.equals(actual.data)
 
 
 def test_issue_transitions_should_end_open_when_closed():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
     closedAt = datetime(2021, 3, 18, tzinfo=timezone.utc)
-    issue = SimpleNamespace(
-        issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=closedAt, label_events=[]
-    )
+    issue = Issue(1, 2, openedAt, issue_type="Bug")
+    issue.history.add_events([("closed", closedAt, None)])
 
     test_data = [
         {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
@@ -117,9 +161,7 @@ def test_issue_transitions_should_end_open_when_closed():
 
 def test_issue_transitions_should_open_indefinitely():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
-    issue = SimpleNamespace(
-        issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=None, label_events=[]
-    )
+    issue = Issue(1, 2, openedAt, issue_type="Bug")
 
     test_data = [
         {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
@@ -133,9 +175,8 @@ def test_issue_transitions_should_open_indefinitely():
 def test_issue_transitions_should_provide_str():
     openedAt = datetime(2021, 3, 14, 12, tzinfo=timezone.utc)
     closedAt = datetime(2021, 3, 18, tzinfo=timezone.utc)
-    issue = SimpleNamespace(
-        issue_id=1, project_id=2, issue_type="Bug", opened_at=openedAt, closed_at=closedAt, label_events=[]
-    )
+    issue = Issue(1, 2, openedAt, issue_type="Bug")
+    issue.history.add_events([("closed", closedAt, None)])
 
     test_data = [
         {"datetime": openedAt, "project": 2, "id": 1, "type": "Bug", "opened": 1},
@@ -668,16 +709,8 @@ def test_cumulative_flow_shows_hanging_open(stages):
 def test_leadcycletimes_should_be_additive(stages):
     """Lead and cycle times count days between opened, in progress, and closed."""
 
-    data = pd.DataFrame.from_records(get_item_over_week(), index=["datetime"])
-    item1 = SimpleNamespace(data=data)
-
-    data = pd.DataFrame.from_records(get_item_over_weekend(), index=["datetime"])
-    item2 = SimpleNamespace(data=data)
-
-    lct = LeadCycleTimes(
-        [item1, item2], stage="inprogress", start_date=datetime(2021, 3, 15), end_date=datetime(2021, 3, 19)
-    )
-    df = lct.get_data_frame()
+    obj = LeadCycleTimes([get_item_over_week(), get_item_over_weekend()], stage="inprogress")
+    df = obj.get_data_frame()
     print(df.to_csv())
     assert all([a == b for a, b in zip(df["lead"].array, [5, 4])])
     assert all([a == b for a, b in zip(df["cycle"].array, [3, 2])])
@@ -688,14 +721,15 @@ def get_item_over_week():
     inProgressAt = openedAt + timedelta(days=2)
     closedAt = datetime(2021, 3, 19, 21, tzinfo=timezone.utc)
 
-    test_data = [
-        {"datetime": openedAt, "project": 1, "id": 1, "type": "bug", "opened": 1},
-        {"datetime": openedAt + timedelta(days=1), "project": 1, "id": 1, "type": "bug", "opened": 0, "todo": 1},
-        {"datetime": inProgressAt, "project": 1, "id": 1, "type": "bug", "todo": 0, "inprogress": 1},
-        {"datetime": openedAt + timedelta(days=3), "project": 1, "id": 1, "type": "bug", "inprogress": 0, "review": 1},
-        {"datetime": closedAt, "project": 1, "id": 1, "type": "bug", "review": 0, "closed": 1},
+    issue = Issue(1, 2, openedAt, issue_type="Bug")
+    history = [
+        ("todo", openedAt + timedelta(days=1), inProgressAt),
+        ("inprogress", inProgressAt, openedAt + timedelta(days=3)),
+        ("review", openedAt + timedelta(days=3), None),
+        ("closed", closedAt, None),
     ]
-    return test_data
+    issue.history.add_events(history)
+    return issue
 
 
 def get_item_over_weekend():
@@ -704,11 +738,98 @@ def get_item_over_weekend():
     inProgressAt = openedAt + timedelta(days=2)
     closedAt = datetime(2021, 3, 23, 21, tzinfo=timezone.utc)  # Tuesday
 
-    test_data = [
-        {"datetime": openedAt, "project": 1, "id": 2, "type": "bug", "opened": 1},
-        {"datetime": openedAt + timedelta(days=1), "project": 1, "id": 2, "type": "bug", "opened": 0, "todo": 1},
-        {"datetime": inProgressAt, "project": 1, "id": 2, "type": "bug", "todo": 0, "inprogress": 1},
-        {"datetime": openedAt + timedelta(days=3), "project": 1, "id": 2, "type": "bug", "inprogress": 0, "review": 1},
-        {"datetime": closedAt, "project": 1, "id": 2, "type": "bug", "review": 0, "closed": 1},
+    issue = Issue(2, 2, openedAt, issue_type="Bug")
+    history = [
+        ("todo", openedAt + timedelta(days=1), inProgressAt),
+        ("inprogress", inProgressAt, openedAt + timedelta(days=3)),
+        ("review", openedAt + timedelta(days=3), None),
+        ("closed", closedAt, None),
     ]
-    return test_data
+    issue.history.add_events(history)
+    return issue
+
+
+def test_leadcycletime_should_use_opened_when_stage_unavailable():
+    obj = LeadCycleTimes([get_item_without_stage()], stage="inprogress")
+    df = obj.get_data_frame()
+    print(df.to_csv())
+    assert all([a == b for a, b in zip(df["lead"].array, [5])])
+    assert all([a == b for a, b in zip(df["cycle"].array, [5])])
+
+
+def get_item_without_stage():
+    openedAt = datetime(2021, 3, 15, 6, tzinfo=timezone.utc)
+    inProgressAt = openedAt + timedelta(days=2)
+    closedAt = datetime(2021, 3, 19, 21, tzinfo=timezone.utc)
+
+    issue = Issue(1, 2, openedAt, issue_type="Bug")
+    history = [
+        ("todo", openedAt + timedelta(days=1), inProgressAt),
+        ("review", openedAt + timedelta(days=3), None),
+        ("closed", closedAt, None),
+    ]
+    issue.history.add_events(history)
+    return issue
+
+
+def test_leadcycletime_should_calculate_reopened_leadtimes():
+    obj = LeadCycleTimes([get_item_reopened_twice()], stage="inprogress")
+    df = obj.get_data_frame()
+    print(df.to_csv())
+    assert all([a == b for a, b in zip(df["lead"].array, [6])])
+    assert all([a == b for a, b in zip(df["cycle"].array, [3])])
+
+
+def test_leadcycletime_should_calculate_reopened_counts():
+    obj = LeadCycleTimes([get_item_reopened_twice()], stage="inprogress")
+    df = obj.get_data_frame()
+    print(df.to_csv())
+    assert all([a == b for a, b in zip(df["lead"].array, [6])])
+    assert all([a == b for a, b in zip(df["cycle"].array, [3])])
+
+
+def get_item_reopened_twice():
+    openedAt = datetime(2021, 3, 15, 6, tzinfo=timezone.utc)
+    inProgressAt = openedAt + timedelta(days=2)
+    closedAt = datetime(2021, 3, 19, 21, tzinfo=timezone.utc)
+    # last closed extends over a weekend, adding 1 bus day
+    lastClosedAt = datetime(2021, 3, 22, tzinfo=timezone.utc)
+
+    issue = Issue(1, 2, openedAt, issue_type="Bug")
+    history = [
+        ("todo", openedAt + timedelta(days=1), inProgressAt),
+        ("inprogress", inProgressAt, openedAt + timedelta(days=3)),
+        ("review", openedAt + timedelta(days=3), None),
+        ("closed", closedAt, None),
+        ("reopened", closedAt + timedelta(hours=3), None),
+        ("closed", closedAt + timedelta(hours=6), None),
+        ("reopened", closedAt + timedelta(hours=9), None),
+        ("closed", lastClosedAt, None),
+    ]
+    issue.history.add_events(history)
+    return issue
+
+
+def test_leadcycletime_should_honor_first_closed():
+    obj = LeadCycleTimes([get_item_closed_without_work()], stage="inprogress")
+    df = obj.get_data_frame()
+    print(df.to_csv())
+    assert all([a == b for a, b in zip(df["lead"].array, [6])])
+    assert all([a == b for a, b in zip(df["cycle"].array, [5])])
+
+
+def get_item_closed_without_work():
+    openedAt = datetime(2021, 3, 15, 6, tzinfo=timezone.utc)
+    closedAt = datetime(2021, 3, 19, 21, tzinfo=timezone.utc)
+    # last closed extends over a weekend, adding 1 bus day
+    lastClosedAt = datetime(2021, 3, 22, tzinfo=timezone.utc)
+
+    issue = Issue(1, 2, openedAt, issue_type="Bug")
+    history = [
+        ("closed", closedAt, None),
+        ("reopened", closedAt + timedelta(hours=3), None),
+        ("inprogress", closedAt + timedelta(hours=6), None),
+        ("closed", lastClosedAt, None),
+    ]
+    issue.history.add_events(history)
+    return issue

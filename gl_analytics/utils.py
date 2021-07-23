@@ -1,5 +1,4 @@
 import logging
-import time
 
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -14,5 +13,5 @@ def timer(msg):
         yield
     finally:
         end = datetime.now(tz=timezone.utc)
-        delta = (end-start) / timedelta(milliseconds=1)
+        delta = (end - start) / timedelta(milliseconds=1)
         _log.debug(f"{msg} took {delta}ms")

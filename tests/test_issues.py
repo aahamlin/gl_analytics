@@ -1,28 +1,10 @@
+# from types import SimpleNamespace
 import pytest
 import datetime
 
 from dateutil.utils import within_delta
 
 import gl_analytics.issues as issues
-
-
-def test_issues_error():
-    assert isinstance(issues.IssuesError(), Exception)
-
-
-def test_abstract_session():
-    with pytest.raises(issues.IssuesError):
-        issues.Session().get()
-
-
-def test_abstract_repository():
-    with pytest.raises(issues.IssuesError):
-        issues.AbstractRepository().list()
-
-
-def test_abstract_resolver():
-    with pytest.raises(issues.IssuesError):
-        issues.AbstractResolver().resolve()
 
 
 def test_gitlab_session(session):
@@ -51,11 +33,11 @@ def test_gitlab_session_requires_relative_path(session, requests_mock):
         session.get("/groups/gozynta/issues")
 
 
-def test_repo_requires_group_and_milestone():
+def test_repo_requires_group_and_milestone(session):
     with pytest.raises(ValueError):
-        issues.GitlabIssuesRepository(issues.Session(), milestone="foo")
+        issues.GitlabIssuesRepository(session, milestone="foo")
     with pytest.raises(ValueError):
-        issues.GitlabIssuesRepository(issues.Session(), group="foo")
+        issues.GitlabIssuesRepository(session, group="foo")
 
 
 @pytest.mark.usefixtures("get_paged_issues")
@@ -106,6 +88,7 @@ def test_scopelabelresolver_includes_qualifying_events(session):
     )
 
     expected_labels = [
+        ("opened", datetime.datetime(2021, 2, 9, 12, 59, 43, tzinfo=datetime.timezone.utc), None),
         (
             "Designing",
             datetime.datetime(2021, 2, 9, 16, 59, 37, 783, tzinfo=datetime.timezone.utc),
@@ -122,8 +105,9 @@ def test_scopelabelresolver_includes_qualifying_events(session):
     assert len(issue_list) == 1
 
     the_issue = issue_list[0]
-    assert len(the_issue.label_events) == 2  # designing, in progress
-    assert all(compare_label_events(a, b) for a, b in zip(expected_labels, the_issue.label_events))
+    assert len(the_issue.history) == 3  # designing, in progress
+    print(the_issue.history)
+    assert all(compare_label_events(a, b) for a, b in zip(expected_labels, the_issue.history))
 
 
 @pytest.mark.usefixtures("get_issues")
@@ -138,11 +122,12 @@ def test_scopedlabelresolver_skips_non_qualifying_events(session):
     )
 
     expected_labels = [
+        ("opened", datetime.datetime(2021, 2, 9, 12, 59, 43, tzinfo=datetime.timezone.utc), None),
         (
             "Designing",
             datetime.datetime(2021, 2, 9, 16, 59, 37, 783, tzinfo=datetime.timezone.utc),
             datetime.datetime(2021, 2, 9, 17, 0, 49, 416, tzinfo=datetime.timezone.utc),
-        )
+        ),
     ]
 
     issue_list = repo.list()
@@ -150,9 +135,9 @@ def test_scopedlabelresolver_skips_non_qualifying_events(session):
     assert len(issue_list) == 1
 
     the_issue = issue_list[0]
-    assert len(the_issue.label_events) == 1  # designing
+    assert len(the_issue.history) == 2  # opened, designing
 
-    assert compare_label_events(expected_labels[0], the_issue.label_events[0])
+    assert compare_label_events(expected_labels[1], the_issue.history[1])
 
 
 @pytest.mark.usefixtures("get_issues_with_label")

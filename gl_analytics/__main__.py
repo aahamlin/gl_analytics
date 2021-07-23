@@ -3,15 +3,17 @@
 """
 import argparse
 import logging
-import os
+
 import sys
 
 import datetime
 
+from collections import namedtuple
+from types import SimpleNamespace
+
 from .config import load_config
-from .func import foldl
-from .issues import GitlabSession, GitlabIssuesRepository, GitlabScopedLabelResolver
-from .metrics import IssueStageTransitions, CumulativeFlow, LeadCycleTimes
+from .issues import GitlabSession, GitlabIssuesRepository, GitlabScopedLabelResolver, GitLabStateEventResolver
+from .metrics import CumulativeFlow, LeadCycleTimes, build_transitions
 from .report import CsvReport, PlotReport
 from .utils import timer
 
@@ -43,10 +45,6 @@ def create_parser(config):
         nargs="?",
         default="#started",
         help="Milestone id, e.g. mb_v1.3 or #started",
-    )
-
-    common_parser.add_argument(
-        "-d", "--days", metavar="days", type=int, nargs="?", default=30, help="Number of days to analyze, default 30"
     )
 
     # parser.add_argument(
@@ -84,7 +82,12 @@ def create_parser(config):
         parents=[common_parser],
         help="Generate cumulative flow data in the given report format.",
     )
-    cumulative_flow_parser.set_defaults(func=CumulativeFlow, extra_args=dict(stages=DEFAULT_SERIES))
+
+    cumulative_flow_parser.add_argument(
+        "-d", "--days", metavar="days", type=int, nargs="?", default=30, help="Number of days to analyze, default 30"
+    )
+
+    cumulative_flow_parser.set_defaults(func=cumulative_flow_factory, extra_args=dict(stages=DEFAULT_SERIES))
 
     cycletime_parser = subparsers.add_parser(
         "cycletime",
@@ -92,14 +95,40 @@ def create_parser(config):
         parents=[common_parser],
         help="Generate cycletime data in the given report format.",
     )
-    cycletime_parser.set_defaults(func=LeadCycleTimes, extra_args=dict(stage=DEFAULT_PIVOT))
+    cycletime_parser.set_defaults(func=cycle_time_factory, extra_args=dict(stage=DEFAULT_PIVOT))
 
     return parser
 
 
-def build_transitions(issues):
-    """Create a list of transitions from a list of issues."""
-    return [IssueStageTransitions(i) for i in issues]
+def cumulative_flow_factory(session, args):
+    repository = GitlabIssuesRepository(
+        session,
+        group=args.group,
+        milestone=args.milestone,
+        resolvers=[GitlabScopedLabelResolver, GitLabStateEventResolver],
+    )
+    return repository, cumulative_flow_cls_factory
+
+
+def cumulative_flow_cls_factory(issues, *args, **kwargs):
+    transitions = build_transitions(issues)
+    return CumulativeFlow(transitions, *args, **kwargs)
+
+
+def cycle_time_factory(session, args):
+    repository = GitlabIssuesRepository(
+        session,
+        group=args.group,
+        milestone=args.milestone,
+        state="closed",
+        resolvers=[GitlabScopedLabelResolver, GitLabStateEventResolver],
+    )
+    return repository, cycle_time_cls_factory
+
+
+def cycle_time_cls_factory(issues, *args, **kwargs):
+    # TODO: eliminate the need for transitions here
+    return LeadCycleTimes(issues, *args, **kwargs)
 
 
 class Main:
@@ -118,45 +147,42 @@ class Main:
     def run(self):
         token = self.config["TOKEN"]
         baseurl = self.config["GITLAB_BASE_URL"]
-        outfile = self.prog_args.outfile
-        days = self.prog_args.days
-
         session = GitlabSession(baseurl, access_token=token)
+        QueryArgs = namedtuple("QueryArgs", ["group", "milestone"])
+        query_args = QueryArgs(group=self.prog_args.group, milestone=self.prog_args.milestone)
+        ReportArgs = namedtuple("ReportArgs", ["report", "outfile"])
+        report_args = ReportArgs(report=self.prog_args.report, outfile=self.prog_args.outfile)
 
-        # TODO: change the parse func or the class so that individual aggregations can control the query parameters.
-        #  For example, the cycletime query should filter only Closed items, this needs to be available for the list
-        #  operation above. This will simplify things and allow removal of checking the subparser_name value.
-        repository = GitlabIssuesRepository(
-            session,
-            group=self.prog_args.group,
-            milestone=self.prog_args.milestone,
-            state="closed" if self.prog_args.subparser_name.startswith("cy") else None,
-            resolvers=[GitlabScopedLabelResolver],
-        )
+        repository, aggregator_cls = self.prog_args.func(session, query_args)
+
+        # create a simple dictionary with the rest of the argparser arguments to pass to the aggregator class
+        aggregator_args = {
+            k: v
+            for k, v in self.prog_args.__dict__.items()
+            if k not in query_args._asdict() and k not in report_args._asdict() and k != "extra_args"
+        }
+        aggregator_args.update(self.prog_args.extra_args)
+        # print(f"built args for aggregator class {aggregator_cls} {aggregator_args}")
 
         log = logging.getLogger("main")
 
         with timer("Listing issues"):
             issues = repository.list()
-            log.info(f"Retrieved {len(issues)} issues for {self.prog_args.milestone}")
-
-        # grab all the transitions from the elements in the list
-        with timer("Building data"):
-            transitions = build_transitions(issues)
-            total = foldl(lambda x, y: x + len(y.data), 0, transitions)
-            log.info(f"Identified {total} transitions for {self.prog_args.milestone}")
+            log.info(f"Retrieved {len(issues)} issues for {query_args.milestone}")
 
         with timer("Aggregations"):
-            result = self.prog_args.func(transitions, days=days, **self.prog_args.extra_args)
+            result = aggregator_cls(issues, **aggregator_args)
 
-        report_cls, default_file = self.supported_reports[self.prog_args.report]
-        report = report_cls(result.get_data_frame(), file=(outfile or default_file), title=self.prog_args.milestone)
+        report_cls, default_file = self.supported_reports[report_args.report]
+        report = report_cls(
+            result.get_data_frame(), file=(report_args.outfile or default_file), title=query_args.milestone
+        )
 
         with timer("Export"):
             report.export()
 
-        if outfile:
-            print(f"Created '{outfile}'.")
+        if report_args.outfile:
+            print(f"Created '{report_args.outfile}'.")
 
 
 if __name__ == "__main__":  # pragma: no cover

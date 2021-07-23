@@ -17,6 +17,7 @@ $ pipenv run python -m gl_analytics --milestone mb_v1.3 --days 30
 
 ## Todos
 
+- The cycletime calculation does not do anything to handle **reopened** issues, the result is presently undefined.
 - Create installable (pyproject.toml)
 - Refactor areas marked with XXX comments
 

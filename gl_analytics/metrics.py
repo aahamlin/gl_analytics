@@ -2,12 +2,16 @@ import datetime
 import pandas as pd
 import numpy as np
 
-from itertools import starmap
-from collections.abc import Sequence
-from functools import partial
-from operator import itemgetter
+# from itertools import starmap
+# from collections.abc import Sequence
+from functools import partial, reduce
 
-from .func import foldl
+# from operator import itemgetter
+
+
+def build_transitions(issues):
+    """Create a list of transitions from a list of issues."""
+    return [IssueStageTransitions(i) for i in issues]
 
 
 class IssueStageTransitions:
@@ -37,21 +41,11 @@ class IssueStageTransitions:
         type_name = "type"
         project_name = "project"
 
-        opened = issue.opened_at
-        closed = issue.closed_at
-        label_events = issue.label_events
+        history = issue.history
 
         issue_id = issue.issue_id
         project_id = issue.project_id
         issue_type = issue.issue_type
-
-        # open ends at next transition start or datetime.max
-        if len(label_events) > 0:
-            opened_end = label_events[0][1]
-        elif closed:
-            opened_end = closed
-        else:
-            opened_end = None
 
         def to_record(label, start, end):
             yield dict(
@@ -70,17 +64,8 @@ class IssueStageTransitions:
 
         transitions = []
 
-        transitions.extend(to_record("opened", opened, opened_end))
-
-        if len(label_events) > 0 and closed:
-            last_label_event = label_events.pop()
-            label_events.append((last_label_event[0], last_label_event[1], closed))
-
-        for event in label_events:
+        for event in history:
             transitions.extend(to_record(*event))
-
-        if closed:
-            transitions.extend(to_record("closed", closed, None))
 
         records = {}
         for t in transitions:
@@ -109,6 +94,8 @@ class CumulativeFlow(object):
         days=30,
         end_date=None,
         start_date=None,
+        *args,
+        **kwargs,
     ):
         """Groups stages of workflow by date.
 
@@ -127,7 +114,7 @@ class CumulativeFlow(object):
         cats = pd.Series(pd.Categorical(self._labels, categories=self._labels, ordered=True))
 
         df = pd.DataFrame([], index=self._index_daterange, columns=cats)
-        self._data = foldl(combine_by_totals, df, [a.data for a in transitions])
+        self._data = reduce(combine_by_totals, [a.data for a in transitions], df)
 
     @property
     def included_dates(self):
@@ -193,19 +180,21 @@ def combine_by_totals(d1, d2):
 class LeadCycleTimes:
     """Calculations for a scatter plot diagram."""
 
-    def __init__(self, transitions, stage=None, days=30, end_date=None, start_date=None):
-        """Generate lead & cycle time values from issue transitions."""
+    def __init__(self, issues, stage=None, *args, **kwargs):
+        """Generate lead & cycle time values from issue histories."""
 
         # we could generate a business day range by passing freq='B' into date_range calculation.
 
-        # XXX not sure how to use the data range?
-        self._index_daterange = _calculate_date_range(days, start_date, end_date)
-        df = pd.DataFrame([])
-        df = foldl(partial(combine_by_cycles, stage), df, [a.data for a in transitions])
+        # flatten the array of issues and histories to an array of records(dictionaries)
+        # build dataframe from records
+        # calculate the lead and cycle times
+        records = self._build_records_from_issues(issues, stage)
+        df = pd.DataFrame.from_records(records)
+
         df["lead"] = [
             x + 1
             for x in np.busday_count(
-                df["opened"].values.astype("datetime64[D]"), df["closed"].values.astype("datetime64[D]")
+                df["opened"].values.astype("datetime64[D]"), df["last_closed"].values.astype("datetime64[D]")
             )
         ]
         df["cycle"] = [
@@ -220,23 +209,34 @@ class LeadCycleTimes:
         # print("Data", self._data)
         return self._data
 
+    def _build_records_from_issues(self, issues, stage):
+        records = []
+        # XXX maybe this is just a helper method on the Issue class?
+        for issue in issues:
+            rec = {"id": issue.issue_id, "project": issue.project_id, "type": issue.issue_type}
+            update_args = {}
+            reopened_count = 0
+            for k, v1, _ in issue.history:
+                # for cycletime: process from 1st stage to 1st closed event
+                # filter events to opened, 1st "stage" and closed values
+                if k == "opened" or ((k == stage or k == "closed") and k not in update_args):
+                    update_args[k] = v1
+                # for leadtime: from opened to last closed event
+                if k == "closed":
+                    update_args["last_closed"] = v1
+                # count occurrences of reopened
+                if k == "reopened":
+                    reopened_count += 1
 
-def combine_by_cycles(cycle_label, d1, d2):
-    tmp = d2.filter(["opened", cycle_label, "closed"])
-    tmp = tmp.replace(to_replace=0, value=np.nan)
-    tmp = tmp.dropna(how="all")
+            # if 1st stage is not present or newer than 1st closed, use opened instead
+            if stage not in update_args or update_args[stage] > update_args["closed"]:
+                update_args[stage] = update_args["opened"]
 
-    # wip equals open if not present
-    wip_index = 0 if cycle_label not in tmp else 1
+            # include reopened count
+            update_args["reopened"] = reopened_count
 
-    open_date = tmp.index[0]
-    wip_date = tmp.index[wip_index]
-    closed_date = tmp.index[wip_index + 1]
+            rec.update(update_args)
+            # print(f"built record {rec}")
+            records.append(rec)
 
-    row = {"id": d2["id"][0], "project": d2["project"][0], "type": d2["type"][0]}
-    row["opened"] = open_date
-    row[cycle_label] = wip_date
-    row["closed"] = closed_date
-
-    df = pd.DataFrame.from_records([row])
-    return d1.append(df)
+        return records
