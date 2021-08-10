@@ -432,10 +432,9 @@ def test_cumulative_flow_reports_open_closed(stages):
     data = pd.DataFrame.from_records(test_data, index=["datetime"])
     tr = SimpleNamespace(data=data)
 
-    series1 = ["opened"] + stages + ["closed"]
     cf = CumulativeFlow(
         [tr],
-        stages=series1,
+        stages=stages,
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 19),
     )
@@ -461,10 +460,9 @@ def test_cumulative_flow_created_to_closed_same_day(stages):
     data = pd.DataFrame.from_records(test_data, index=["datetime"])
     tr = SimpleNamespace(data=data)
 
-    series1 = ["opened"] + stages + ["closed"]
     cf = CumulativeFlow(
         [tr],
-        stages=series1,
+        stages=stages,
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 19),
     )
@@ -480,7 +478,7 @@ def test_cumulative_flow_created_to_closed_same_day(stages):
     assert all([a == b for a, b in zip(df["closed"].array, [0, 1, 1, 1, 1])])
 
 
-def test_cumulative_flow_filtered_labels_do_not_affect_count_of_columns():
+def test_cumulative_flow_filtered_labels_do_not_affect_count_of_columns(stages):
     openedAt = datetime(2021, 3, 15, 3, tzinfo=timezone.utc)
     closedAt = datetime(2021, 3, 19, 22, tzinfo=timezone.utc)
 
@@ -496,7 +494,7 @@ def test_cumulative_flow_filtered_labels_do_not_affect_count_of_columns():
     data = pd.DataFrame.from_records(test_data, index=["datetime"])
     tr = SimpleNamespace(data=data)
 
-    series1 = ["opened", "inprogress", "done", "closed"]
+    series1 = [s for s in stages if s not in ["todo", "review"]]
 
     cf = CumulativeFlow(
         [tr],
@@ -519,7 +517,7 @@ def test_cumulative_flow_filtered_labels_do_not_affect_count_of_columns():
     assert all([a == b for a, b in zip(df["closed"].array, [0, 0, 0, 0, 1])])
 
 
-def test_cumulative_flow_accounts_for_filtered_stages():
+def test_cumulative_flow_accounts_for_filtered_stages(stages):
     openedAt = datetime(2021, 3, 15, 3, tzinfo=timezone.utc)
     closedAt = datetime(2021, 3, 19, 22, tzinfo=timezone.utc)
 
@@ -535,7 +533,7 @@ def test_cumulative_flow_accounts_for_filtered_stages():
     tr = SimpleNamespace(data=data)
 
     # create new series without todo or review columns
-    series1 = ["opened", "inprogress", "done", "closed"]
+    series1 = [s for s in stages if s not in ["todo", "review"]]
 
     cf = CumulativeFlow(
         [tr],
@@ -669,10 +667,9 @@ def test_cumulative_flow_label_removed_but_not_closed(stages):
     data = pd.DataFrame.from_records(test_data, index=["datetime"])
     tr = SimpleNamespace(data=data)
 
-    series = ["opened"] + stages + ["closed"]
     cf = CumulativeFlow(
         [tr],
-        stages=series,
+        stages=stages,
         start_date=datetime(2021, 3, 15),
         end_date=datetime(2021, 3, 19),
     )
@@ -692,11 +689,10 @@ def test_cumulative_flow_shows_hanging_open(stages):
 
     data = pd.DataFrame.from_records(test_data, index=["datetime"])
     tr = SimpleNamespace(data=data)
-    series = ["opened"] + stages + ["closed"]
 
     cf = CumulativeFlow(
         [tr],
-        stages=series,
+        stages=stages,
         start_date=datetime(2021, 3, 17),
         end_date=datetime(2021, 3, 19),
     )
@@ -709,7 +705,7 @@ def test_cumulative_flow_shows_hanging_open(stages):
 def test_leadcycletimes_should_be_additive(stages):
     """Lead and cycle times count days between opened, in progress, and closed."""
 
-    obj = LeadCycleTimes([get_item_over_week(), get_item_over_weekend()], stage="inprogress")
+    obj = LeadCycleTimes([get_item_over_week(), get_item_over_weekend()], wip="inprogress", stages=stages)
     df = obj.get_data_frame()
     print(df.to_csv())
     assert all([a == b for a, b in zip(df["lead"].array, [5, 4])])
@@ -749,43 +745,19 @@ def get_item_over_weekend():
     return issue
 
 
-def test_leadcycletime_should_use_opened_when_stage_unavailable():
-    obj = LeadCycleTimes([get_item_without_stage()], stage="inprogress")
-    df = obj.get_data_frame()
-    print(df.to_csv())
-    assert all([a == b for a, b in zip(df["lead"].array, [5])])
-    assert all([a == b for a, b in zip(df["cycle"].array, [5])])
-
-
-def get_item_without_stage():
-    openedAt = datetime(2021, 3, 15, 6, tzinfo=timezone.utc)
-    inProgressAt = openedAt + timedelta(days=2)
-    closedAt = datetime(2021, 3, 19, 21, tzinfo=timezone.utc)
-
-    issue = Issue(1, 2, openedAt, issue_type="Bug")
-    history = [
-        ("todo", openedAt + timedelta(days=1), inProgressAt),
-        ("review", openedAt + timedelta(days=3), None),
-        ("closed", closedAt, None),
-    ]
-    issue.history.add_events(history)
-    return issue
-
-
-def test_leadcycletime_should_calculate_reopened_leadtimes():
-    obj = LeadCycleTimes([get_item_reopened_twice()], stage="inprogress")
+def test_leadcycletime_should_calculate_reopened_leadtimes(stages):
+    obj = LeadCycleTimes([get_item_reopened_twice()], wip="inprogress", stages=stages)
     df = obj.get_data_frame()
     print(df.to_csv())
     assert all([a == b for a, b in zip(df["lead"].array, [6])])
     assert all([a == b for a, b in zip(df["cycle"].array, [3])])
 
 
-def test_leadcycletime_should_calculate_reopened_counts():
-    obj = LeadCycleTimes([get_item_reopened_twice()], stage="inprogress")
+def test_leadcycletime_should_calculate_reopened_counts(stages):
+    obj = LeadCycleTimes([get_item_reopened_twice()], wip="inprogress", stages=stages)
     df = obj.get_data_frame()
     print(df.to_csv())
-    assert all([a == b for a, b in zip(df["lead"].array, [6])])
-    assert all([a == b for a, b in zip(df["cycle"].array, [3])])
+    assert all([a == b for a, b in zip(df["reopened"].array, [2])])
 
 
 def get_item_reopened_twice():
@@ -797,7 +769,7 @@ def get_item_reopened_twice():
 
     issue = Issue(1, 2, openedAt, issue_type="Bug")
     history = [
-        ("todo", openedAt + timedelta(days=1), inProgressAt),
+        ("opened", openedAt + timedelta(days=1), inProgressAt),
         ("inprogress", inProgressAt, openedAt + timedelta(days=3)),
         ("review", openedAt + timedelta(days=3), None),
         ("closed", closedAt, None),
@@ -810,15 +782,15 @@ def get_item_reopened_twice():
     return issue
 
 
-def test_leadcycletime_should_honor_first_closed():
-    obj = LeadCycleTimes([get_item_closed_without_work()], stage="inprogress")
+def test_leadcycletime_should_record_closed_without_work(stages):
+    obj = LeadCycleTimes([get_item_closed_without_work_before_closed()], wip="inprogress", stages=stages)
     df = obj.get_data_frame()
     print(df.to_csv())
     assert all([a == b for a, b in zip(df["lead"].array, [6])])
-    assert all([a == b for a, b in zip(df["cycle"].array, [5])])
+    assert all([a == b for a, b in zip(df["cycle"].array, [1])])
 
 
-def get_item_closed_without_work():
+def get_item_closed_without_work_before_closed():
     openedAt = datetime(2021, 3, 15, 6, tzinfo=timezone.utc)
     closedAt = datetime(2021, 3, 19, 21, tzinfo=timezone.utc)
     # last closed extends over a weekend, adding 1 bus day
@@ -830,6 +802,46 @@ def get_item_closed_without_work():
         ("reopened", closedAt + timedelta(hours=3), None),
         ("inprogress", closedAt + timedelta(hours=6), None),
         ("closed", lastClosedAt, None),
+    ]
+    issue.history.add_events(history)
+    return issue
+
+
+def test_leadcycletime_should_find_nearest_work_from_label(stages):
+    obj = LeadCycleTimes([get_item_closed_without_wip()], wip="inprogress", stages=stages)
+    df = obj.get_data_frame()
+    print(df.to_csv())
+    assert all([a == b for a, b in zip(df["lead"].array, [5])])
+    assert all([a == b for a, b in zip(df["cycle"].array, [2])])
+
+
+def get_item_closed_without_wip():
+    openedAt = datetime(2021, 3, 15, 6, tzinfo=timezone.utc)
+    closedAt = datetime(2021, 3, 19, 21, tzinfo=timezone.utc)
+    issue = Issue(1, 2, openedAt, issue_type="Bug")
+    history = [
+        ("review", openedAt + timedelta(days=3), None),
+        ("closed", closedAt, None),
+    ]
+    issue.history.add_events(history)
+    return issue
+
+
+def test_leadcycletime_should_find_nearest_work_from_merge_request(stages):
+    obj = LeadCycleTimes([get_item_closed_with_merge_request()], wip="inprogress", stages=stages)
+    df = obj.get_data_frame()
+    print(df.to_csv())
+    assert all([a == b for a, b in zip(df["lead"].array, [5])])
+    assert all([a == b for a, b in zip(df["cycle"].array, [2])])
+
+
+def get_item_closed_with_merge_request():
+    openedAt = datetime(2021, 3, 15, 6, tzinfo=timezone.utc)
+    closedAt = datetime(2021, 3, 19, 21, tzinfo=timezone.utc)
+    issue = Issue(1, 2, openedAt, issue_type="Bug")
+    history = [
+        ("merge_request", openedAt + timedelta(days=3), None),
+        ("closed", closedAt, None),
     ]
     issue.history.add_events(history)
     return issue

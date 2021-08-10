@@ -73,6 +73,10 @@ class AbstractRepository(ABC):  # pragma: no cover
 
 
 class AbstractResolver(ABC):  # pragma: no cover
+    def __init__(self, session, raise_for_status=False):
+        self._session = session
+        self._raise_for_status = raise_for_status
+
     @property
     @abstractmethod
     def session(self):
@@ -93,7 +97,8 @@ class AbstractResolver(ABC):  # pragma: no cover
 
     def fetch(self, url):
         r = self.session.get(url)
-        r.raise_for_status()
+        if self._raise_for_status:
+            r.raise_for_status()
         payload = r.json()
         return payload
 
@@ -118,7 +123,7 @@ class GitlabIssuesRepository(AbstractRepository):
     """
 
     # XXX rename to reflect group requirement? or, explore using python-gitlab package.
-    def __init__(self, session, group=None, resolvers=[]):
+    def __init__(self, session, group=None, resolvers=None):
         """Initialize a repository.
 
         Required:
@@ -185,7 +190,8 @@ class GitlabIssuesRepository(AbstractRepository):
         opened_at = date_parser.parse(item["created_at"])
         issue_type = self._find_type_label(item)
         issue = Issue(issue_id, project_id, opened_at, issue_type=issue_type)
-        self._resolve_fields(issue)
+        if self._resolvers:
+            self._resolve_fields(issue)
         return issue
 
     def _find_type_label(self, item):
@@ -209,9 +215,8 @@ class GitlabScopedLabelResolver(HistoryResolver):
 
         Optionally, provide the scoped label, the start of a scoped label up to the double-colon (::).
         """
-        self._session = session
         self._scope = scope + "::"
-        super().__init__(*args, **kwargs)
+        super().__init__(session, raise_for_status=True, *args, **kwargs)
 
     @property
     def session(self):
@@ -267,8 +272,7 @@ class GitlabScopedLabelResolver(HistoryResolver):
 
 class GitLabStateEventResolver(HistoryResolver):
     def __init__(self, session, *args, **kwargs):
-        self._session = session
-        super().__init__(*args, **kwargs)
+        super().__init__(session, raise_for_status=True, *args, **kwargs)
 
     @property
     def session(self):
@@ -283,6 +287,28 @@ class GitLabStateEventResolver(HistoryResolver):
             state, datetimestr = event["state"], event["created_at"]
             dt = date_parser.parse(datetimestr)
             acc.append((state, dt, None))
+            return acc
+
+        return reduce(accumulate_state_events, res, [])
+
+
+class GitLabClosedByMergeRequestResolver(HistoryResolver):
+    def __init__(self, session, *args, **kwargs):
+        super().__init__(session, raise_for_status=False, *args, **kwargs)
+
+    @property
+    def session(self):
+        return self._session
+
+    def build_request_url(self, project_id, issue_id):
+        url = "projects/{0}/issues/{1}/closed_by".format(project_id, issue_id)
+        return url
+
+    def process_history(self, res):
+        def accumulate_state_events(acc, event):
+            start_dt = date_parser.parse(event["created_at"])
+            end_dt = date_parser.parse(event["merged_at"])
+            acc.append(("merge_request", start_dt, end_dt))
             return acc
 
         return reduce(accumulate_state_events, res, [])
