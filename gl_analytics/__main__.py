@@ -12,14 +12,16 @@ logging.getLogger().setLevel(logging.INFO)
 # logging.getLogger('gl_analytics.utils').setLevel(logging.DEBUG)
 # logging.getLogger("gl_analytics.issues").setLevel(logging.DEBUG)
 
-DEFAULT_SERIES = [
+
+# TODO: other organizations/projects may use different workflow labels
+DEFAULT_STAGES = [
     "opened",
     "In Progress",
     "Code Review",
     "closed",
 ]
 
-DEFAULT_PIVOT = "In Progress"
+DEFAULT_WIP = "In Progress"
 
 
 log = logging.getLogger("main")
@@ -81,7 +83,7 @@ def create_parser(config):
         "-d", "--days", metavar="days", type=int, nargs="?", default=30, help="Number of days to analyze, default 30"
     )
 
-    cumulative_flow_parser.set_defaults(func=CumulativeFlowCommand, extra_args=dict(stages=DEFAULT_SERIES))
+    cumulative_flow_parser.set_defaults(func=CumulativeFlowCommand, extra_args=dict(stages=DEFAULT_STAGES))
 
     cycletime_parser = subparsers.add_parser(
         "cycletime",
@@ -89,7 +91,7 @@ def create_parser(config):
         parents=[common_parser],
         help="Generate cycletime data in the given report format.",
     )
-    cycletime_parser.set_defaults(func=CycleTimeCommand, extra_args=dict(stage=DEFAULT_PIVOT))
+    cycletime_parser.set_defaults(func=CycleTimeCommand, extra_args=dict(wip=DEFAULT_WIP, stages=DEFAULT_STAGES))
 
     return parser
 

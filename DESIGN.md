@@ -1,11 +1,9 @@
 # Design notes
 
-Refactor 03 Aug 2021:
+Necessary changes:
 
+- Add a Config command to store local settings for a user (gitlab info, workflow labels)
 - IssueStageTransitions. This class only applies to the CumulativeFlow.
-- Create static method on CumulativeFlow to transform the issues
-- Add parallel processing using ThreadPool or ProcessPool
-- Change CycleTime to use different format than CumulativeFlow
 
 ## Command design classes
 

@@ -4,7 +4,13 @@ import sys
 from abc import ABC, abstractmethod
 from collections import namedtuple
 
-from .issues import GitlabSession, GitlabIssuesRepository, GitlabScopedLabelResolver, GitLabStateEventResolver
+from .issues import (
+    GitlabSession,
+    GitLabClosedByMergeRequestResolver,
+    GitlabIssuesRepository,
+    GitlabScopedLabelResolver,
+    GitLabStateEventResolver,
+)
 from .metrics import CumulativeFlow, LeadCycleTimes, build_transitions
 from .report import CsvReport, PlotReport
 from .utils import timer
@@ -40,16 +46,17 @@ class AggregationCommand(AbstractCommand):
         session = GitlabSession(baseurl, access_token=token)
 
         # XXX currently the repo only supports a group level query
-        repository = GitlabIssuesRepository(
-            session,
-            group=self.prog_args.group,
-            resolvers=[GitlabScopedLabelResolver, GitLabStateEventResolver],
-        )
+        repository = GitlabIssuesRepository(session, group=self.prog_args.group, resolvers=self.resolvers)
         return repository
 
     @abstractmethod
-    def list(self, repository):
-        raise NotImplementedError()  # pragma: no cover
+    def list(self, repository):  # pragma: no cover
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
+    def resolvers(self):  # pragma: no cover
+        raise NotImplementedError()
 
     def execute(self):
 
@@ -61,7 +68,7 @@ class AggregationCommand(AbstractCommand):
         aggregator_args = {
             k: v
             for k, v in self.prog_args.__dict__.items()
-            if k not in report_args._asdict() and k not in ["group", "milestone", "extra_args"]
+            if k not in report_args._asdict() and k not in ["command", "func", "group", "milestone", "extra_args"]
         }
         aggregator_args.update(self.prog_args.extra_args)
 
@@ -99,6 +106,10 @@ class CumulativeFlowCommand(AggregationCommand):
     def list(self, repository):
         return repository.list(milestone=self.prog_args.milestone)
 
+    @property
+    def resolvers(self):
+        return [GitlabScopedLabelResolver, GitLabStateEventResolver]
+
     def aggregate_results(self, issues, *args, **kwargs):
         transitions = build_transitions(issues)
         return CumulativeFlow(transitions, *args, **kwargs)
@@ -110,6 +121,10 @@ class CycleTimeCommand(AggregationCommand):
 
     def list(self, repository):
         return repository.list(milestone=self.prog_args.milestone, state="closed")
+
+    @property
+    def resolvers(self):
+        return [GitlabScopedLabelResolver, GitLabStateEventResolver, GitLabClosedByMergeRequestResolver]
 
     def aggregate_results(self, issues, *args, **kwargs):
         return LeadCycleTimes(issues, *args, **kwargs)
