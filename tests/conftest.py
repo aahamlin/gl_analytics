@@ -90,7 +90,7 @@ def get_closed_issues(requests_mock):
 @pytest.fixture
 def get_paged_issues(requests_mock):
     requests_mock.get(
-        "https://gitlab.com/api/v4/groups/gozynta/issues",
+        "https://gitlab.com/api/v4/groups/gozynta/issues?milestone=mb_v1.3&pagination=keyset&scope=all",
         body=to_bytes(TestData.issues.iid2.body),
         headers=to_link_header(TestData.issues.iid2.headers.link),
     )

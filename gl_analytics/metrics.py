@@ -31,6 +31,9 @@ class IssueStageTransitions:
     def __init__(self, issue):
 
         # XXX This could definitely be cleaned up by constructing the list of dicts more directly
+        #      see the new LeadCycleTimes class, building records in a simple loop. Load them all
+        #      into a DataFrame at once.
+        # XXX This can be pushed down into the class itself as well
 
         # print("Issue:", issue)
         issue_id = issue.issue_id
@@ -211,11 +214,13 @@ class LeadCycleTimes:
 
     def _build_records_from_issues(self, issues, stage):
         records = []
-        # XXX maybe this is just a helper method on the Issue class?
         for issue in issues:
             rec = {"id": issue.issue_id, "project": issue.project_id, "type": issue.issue_type}
             update_args = {}
             reopened_count = 0
+            # XXX see latest edits, when items are not labeled w/ inProgress, we can still see that
+            #     there was activity when later labels (CodeReview) were applied, and merge requests
+            #     were referenced. (Possibly assignees, but that seems super unreliable!)
             for k, v1, _ in issue.history:
                 # for cycletime: process from 1st stage to 1st closed event
                 # filter events to opened, 1st "stage" and closed values

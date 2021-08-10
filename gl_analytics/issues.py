@@ -10,6 +10,7 @@ from cachecontrol import CacheControlAdapter
 from cachecontrol.caches.file_cache import FileCache
 from cachecontrol.heuristics import ExpiresAfter
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 
 # from datetime import datetime
 from dateutil import parser as date_parser
@@ -45,12 +46,12 @@ class GitlabSession(Session):
 
         self.session = sess
 
-    def get(self, path):
+    def get(self, path, params=None):
         """Calls request.get(url) appending relative path to session baseurl.
 
         args:
         path - path relative to base_url or absolute url starting with scheme
-
+        params = list of key-value tuples
         raises:
         ValueError - when path starts with "/"
         """
@@ -58,7 +59,7 @@ class GitlabSession(Session):
             raise ValueError
         url = urljoin(self.baseurl, path)
 
-        return self.session.get(url)
+        return self.session.get(url, params=params)
 
     @property
     def baseurl(self):
@@ -67,7 +68,7 @@ class GitlabSession(Session):
 
 class AbstractRepository(ABC):  # pragma: no cover
     @abstractmethod
-    def list(self):
+    def list(self, **kwargs):
         raise NotImplementedError()
 
 
@@ -111,75 +112,63 @@ class HistoryResolver(AbstractResolver):
 
 
 class GitlabIssuesRepository(AbstractRepository):
-    """This is specifically a GitLab Issue repository. Current GitLab version is 13.11.0-pre."""
+    """This is specifically a GitLab Issue repository.
+    It searches issues at the group level.
+    Current GitLab version is 13.11.0-pre.
+    """
 
-    def __init__(self, session, group=None, milestone=None, state=None, resolvers=[]):
+    # XXX rename to reflect group requirement? or, explore using python-gitlab package.
+    def __init__(self, session, group=None, resolvers=[]):
         """Initialize a repository.
 
         Required:
         session: session object
         group: group name or id
-        milestone: milestone name or id
-        state: issue state filter, e.g. 'closed'
 
         Optional:
         resolvers: Specify classes to use to resolve additional fields.
         """
-        if not group or not milestone:
-            raise ValueError("Requires group and milestone")
+
+        if not group:
+            raise ValueError("Requires group")
 
         self._session = session
         self._group = group
-        self._milestone = milestone
-        self._state = state
         self._resolvers = resolvers
-
         self._url = self._build_request_url()
 
     @property
     def url(self):
         return self._url
 
-    def list(self):
-        """Return issues from the repository."""
-        return [x for x in self._page_results()]
+    def list(self, **kwargs):
+        """Return issues from the repository.
+        milestone: milestone name or id
+        state: issue state filter, e.g. 'closed'
+        """
+        return [x for x in self._page_results(**kwargs)]
 
-    # XXX modify this to return a tuple of url and list of params
     def _build_request_url(self):
-        url = "groups/{0}/issues".format(self._group)
+        return "groups/{0}/issues".format(self._group)
 
-        # XXX rebuild using sorted tuples for caching effectiveness
-        # see also https://cachecontrol.readthedocs.io/en/latest/tips.html#query-string-params
-        params = {"pagination": "keyset", "scope": "all", "milestone": self._milestone}
-
-        if self._state:
-            params["state"] = self._state
-
-        _log.debug("built url: %s", url)
-        _log.debug("built params: %s", params)
-        return "{0}?{1}".format(url, urlencode(params))
-
-    def _page_results(self):
+    def _page_results(self, **kwargs):
         """Generator of issues from pages of results."""
-
-        # starting request
+        params = [("pagination", "keyset"), ("scope", "all")]
+        params += [(k, v) for k, v in kwargs.items()]
         url = self.url
 
         hasMore = True
         while hasMore:
-            # XXX modify this to use url and list of params, e.g. requests.get(url, params=...)
-            # make request
-            r1 = self._session.get(url)
+            r1 = self._session.get(url, params=sorted(params))
             r1.raise_for_status()
 
             # extract the issues from the response body
             payload = r1.json()
             # count = len(payload)
             # print(f'processing {count} items');
-            for item in payload:
-                issue = self._build_issue_from(item)
-                self._resolve_fields(issue)
-                yield issue
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                for issue in executor.map(self._build_issue_from, payload):
+                    yield issue
 
             if r1.links and "next" in r1.links:
                 # setup next page request
@@ -196,6 +185,7 @@ class GitlabIssuesRepository(AbstractRepository):
         opened_at = date_parser.parse(item["created_at"])
         issue_type = self._find_type_label(item)
         issue = Issue(issue_id, project_id, opened_at, issue_type=issue_type)
+        self._resolve_fields(issue)
         return issue
 
     def _find_type_label(self, item):
@@ -233,22 +223,7 @@ class GitlabScopedLabelResolver(HistoryResolver):
         return url
 
     def process_history(self, label_events):
-        """Process transitions through workflow steps.
-
-        Produces a standard record of events so that the `metrics` module can easily
-        process them.
-
-        opened => step1 => step2 => ... => closed
-
-        List of tuples containing "step" and "datetime", e.g. ('opened', 2021-02-09T16:59:37.783Z')
-
-        The data structure will contain enough information to build transitions. Transitions are
-        different than GitLab's adding and removing of Labels on a date. Therefore, we will use the
-        created_at date to signify the transition point of time.
-
-        Assumes:
-        - GitLab orders events by date (oldest first)
-        - Scoped Labels exist until next label or the issue is closed. (see Limitations)
+        """Process transitions through workflow steps.0e84d2c
 
         Limitations:
         - Does not deal with a user removing a scoped label entirely (without either adding another

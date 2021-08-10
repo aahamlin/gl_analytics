@@ -5,6 +5,11 @@ from tests import change_directory, read_filepath
 from gl_analytics.__main__ import Main
 
 
+def test_main_require_command():
+    with pytest.raises(SystemExit):
+        Main([])
+
+
 def test_main_require_user_token(monkeypatch):
     main = Main(["cumulativeflow", "-m", "mb_v1.3"])
     monkeypatch.delitem(main.config, "TOKEN")
