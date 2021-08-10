@@ -183,27 +183,28 @@ def combine_by_totals(d1, d2):
 class LeadCycleTimes:
     """Calculations for a scatter plot diagram."""
 
-    def __init__(self, issues, stage=None, *args, **kwargs):
+    def __init__(self, issues, wip=None, stages=None, *args, **kwargs):
         """Generate lead & cycle time values from issue histories."""
-
         # we could generate a business day range by passing freq='B' into date_range calculation.
+        self.stages = stages or ["opened", "closed"]
+        self.opened = self.stages[0]
+        assert wip in self.stages, "You must provide a valid work-in-progress label to calculate cycle times."
+        self.wip = wip
+        self.closed = self.stages[-1]
 
-        # flatten the array of issues and histories to an array of records(dictionaries)
-        # build dataframe from records
-        # calculate the lead and cycle times
-        records = self._build_records_from_issues(issues, stage)
+        records = self._build_records_from_issues(issues)
         df = pd.DataFrame.from_records(records)
 
         df["lead"] = [
             x + 1
             for x in np.busday_count(
-                df["opened"].values.astype("datetime64[D]"), df["last_closed"].values.astype("datetime64[D]")
+                df[self.opened].values.astype("datetime64[D]"), df["last_closed"].values.astype("datetime64[D]")
             )
         ]
         df["cycle"] = [
             x + 1
             for x in np.busday_count(
-                df[stage].values.astype("datetime64[D]"), df["closed"].values.astype("datetime64[D]")
+                df[self.wip].values.astype("datetime64[D]"), df[self.closed].values.astype("datetime64[D]")
             )
         ]
         self._data = df
@@ -212,7 +213,7 @@ class LeadCycleTimes:
         # print("Data", self._data)
         return self._data
 
-    def _build_records_from_issues(self, issues, stage):
+    def _build_records_from_issues(self, issues):
         records = []
         for issue in issues:
             rec = {"id": issue.issue_id, "project": issue.project_id, "type": issue.issue_type}
@@ -223,19 +224,20 @@ class LeadCycleTimes:
             #     were referenced. (Possibly assignees, but that seems super unreliable!)
             for k, v1, _ in issue.history:
                 # for cycletime: process from 1st stage to 1st closed event
-                # filter events to opened, 1st "stage" and closed values
-                if k == "opened" or ((k == stage or k == "closed") and k not in update_args):
+                # filter events to 1st occurrences of all stages
+                if k in self.stages and k not in update_args:
                     update_args[k] = v1
                 # for leadtime: from opened to last closed event
-                if k == "closed":
+                if k == self.closed:
                     update_args["last_closed"] = v1
-                # count occurrences of reopened
+                # count occurrences of reopened, "reopened" is a gitlab state event
                 if k == "reopened":
                     reopened_count += 1
 
-            # if 1st stage is not present or newer than 1st closed, use opened instead
-            if stage not in update_args or update_args[stage] > update_args["closed"]:
-                update_args[stage] = update_args["opened"]
+            # if wip is not present or newer than 1st closed, then attempt to determine activity
+            first_close_date = update_args[self.closed]
+            if self.wip not in update_args or update_args[self.wip] > first_close_date:
+                update_args[self.wip] = self._find_nearest_available_work(first_close_date, issue.history)
 
             # include reopened count
             update_args["reopened"] = reopened_count
@@ -245,3 +247,19 @@ class LeadCycleTimes:
             records.append(rec)
 
         return records
+
+    def _find_nearest_available_work(self, first_close_date, history):
+        # detecting work by a fuzzy algorithm of events before 1st close date
+        wip_index = self.stages.index(self.wip)
+
+        # TODO ~~ find assigned date (must use the notes api)
+        # earliest date any workflow label greater than "wip" label was added
+        # created_at date of the MR returned from closed_by API
+        labels = self.stages[wip_index:-1]
+        labels.append("merge_request")
+        try:
+            _, nearest_dt, _ = next(filter(lambda x: x[0] in labels and x[1] < first_close_date, history))
+            return nearest_dt
+        except StopIteration:
+            # closed without detected work, should set wip to closed date
+            return first_close_date

@@ -101,6 +101,7 @@ def test_cycletime_must_find_base_url(monkeypatch):
 
 @pytest.mark.usefixtures("get_closed_issues")
 @pytest.mark.usefixtures("get_closed_workflow_labels")
+@pytest.mark.usefixtures("get_closed_by_empty")
 def test_cycletime_prints_csv(capsys, monkeypatch, patch_datetime_now):
     """Test that the main function runs without error."""
     main = Main(["cy", "-m", "mb_v1.3", "-r", "csv"])

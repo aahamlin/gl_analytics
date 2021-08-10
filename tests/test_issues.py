@@ -129,6 +129,26 @@ def test_scopedlabelresolver_skips_non_qualifying_events(session):
     assert compare_label_events(expected_labels[1], the_issue.history[1])
 
 
+@pytest.mark.usefixtures("get_closed_workflow_labels")
+def test_stateeventresolver_records_states(session):
+    state_event_resolver = issues.GitLabStateEventResolver(session)
+    issue = issues.Issue(2, 8273019, datetime.datetime(2021, 3, 9, 12, tzinfo=datetime.timezone.utc))
+    state_event_resolver.resolve(issue)
+    assert issue.closed_at == datetime.datetime(2021, 3, 15, 12, tzinfo=datetime.timezone.utc)
+
+
+@pytest.mark.usefixtures("get_closed_by_merge_request")
+def test_closedbyresolver_records_merge_requests(session):
+    closed_by_resolver = issues.GitLabClosedByMergeRequestResolver(session)
+    issue = issues.Issue(2, 8273019, datetime.datetime(2021, 3, 9, 12, tzinfo=datetime.timezone.utc))
+    closed_by_resolver.resolve(issue)
+    assert issue.history[1] == (
+        "merge_request",
+        datetime.datetime(2021, 3, 13, tzinfo=datetime.timezone.utc),
+        datetime.datetime(2021, 3, 19, tzinfo=datetime.timezone.utc),
+    )
+
+
 @pytest.mark.usefixtures("get_issues_with_label")
 def test_issue_with_typelabel_should_set_type(session):
     repo = issues.GitlabIssuesRepository(session, group="gozynta")
