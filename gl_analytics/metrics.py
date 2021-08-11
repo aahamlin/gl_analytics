@@ -193,18 +193,25 @@ class LeadCycleTimes:
         self.closed = self.stages[-1]
 
         records = self._build_records_from_issues(issues)
-        df = pd.DataFrame.from_records(records)
+        # TODO have output print all columns, with ordered stages
+        columns = (
+            ["issue", "project", "type"] + stages + ["last_closed", "wip_event", "wip", "reopened", "lead", "cycle"]
+        )
 
+        df = pd.DataFrame.from_records(records, columns=columns)
+
+        # for leadtime: from opened to last closed event
         df["lead"] = [
             x + 1
             for x in np.busday_count(
                 df[self.opened].values.astype("datetime64[D]"), df["last_closed"].values.astype("datetime64[D]")
             )
         ]
+        # for cycletime: process from 1st activity to 1st closed event
         df["cycle"] = [
             x + 1
             for x in np.busday_count(
-                df[self.wip].values.astype("datetime64[D]"), df[self.closed].values.astype("datetime64[D]")
+                df["wip"].values.astype("datetime64[D]"), df[self.closed].values.astype("datetime64[D]")
             )
         ]
         self._data = df
@@ -216,28 +223,26 @@ class LeadCycleTimes:
     def _build_records_from_issues(self, issues):
         records = []
         for issue in issues:
-            rec = {"id": issue.issue_id, "project": issue.project_id, "type": issue.issue_type}
+            rec = {"issue": issue.issue_id, "project": issue.project_id, "type": issue.issue_type}
             update_args = {}
             reopened_count = 0
-            # XXX see latest edits, when items are not labeled w/ inProgress, we can still see that
-            #     there was activity when later labels (CodeReview) were applied, and merge requests
-            #     were referenced. (Possibly assignees, but that seems super unreliable!)
             for k, v1, _ in issue.history:
-                # for cycletime: process from 1st stage to 1st closed event
+
                 # filter events to 1st occurrences of all stages
                 if k in self.stages and k not in update_args:
                     update_args[k] = v1
-                # for leadtime: from opened to last closed event
+
                 if k == self.closed:
                     update_args["last_closed"] = v1
                 # count occurrences of reopened, "reopened" is a gitlab state event
                 if k == "reopened":
                     reopened_count += 1
 
-            # if wip is not present or newer than 1st closed, then attempt to determine activity
-            first_close_date = update_args[self.closed]
-            if self.wip not in update_args or update_args[self.wip] > first_close_date:
-                update_args[self.wip] = self._find_nearest_available_work(first_close_date, issue.history)
+            opened_date = update_args[self.opened]
+            closed_date = update_args[self.closed]
+            wip_label, wip_datetime = self._find_nearest_available_work(opened_date, closed_date, issue.history)
+            update_args["wip_event"] = wip_label
+            update_args["wip"] = wip_datetime
 
             # include reopened count
             update_args["reopened"] = reopened_count
@@ -248,18 +253,21 @@ class LeadCycleTimes:
 
         return records
 
-    def _find_nearest_available_work(self, first_close_date, history):
+    def _find_nearest_available_work(self, opened_date, closed_date, history):
         # detecting work by a fuzzy algorithm of events before 1st close date
         wip_index = self.stages.index(self.wip)
 
         # TODO ~~ find assigned date (must use the notes api)
-        # earliest date any workflow label greater than "wip" label was added
-        # created_at date of the MR returned from closed_by API
         labels = self.stages[wip_index:-1]
         labels.append("merge_request")
         try:
-            _, nearest_dt, _ = next(filter(lambda x: x[0] in labels and x[1] < first_close_date, history))
-            return nearest_dt
+            # view all events thru filter: open < event < closed
+            # choose earliest event: label, merge request, or assignment
+            # TODO this did not work for https://gitlab.com/gozynta/cwacc/-/issues/400
+            nearest, nearest_dt, _ = next(
+                filter(lambda x: x[0] in labels and opened_date < x[1] < closed_date, history)
+            )
+            return nearest, nearest_dt
         except StopIteration:
             # closed without detected work, should set wip to closed date
-            return first_close_date
+            return self.closed, closed_date
