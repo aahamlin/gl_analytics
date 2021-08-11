@@ -214,6 +214,8 @@ class LeadCycleTimes:
                 df["wip"].values.astype("datetime64[D]"), df[self.closed].values.astype("datetime64[D]")
             )
         ]
+
+        # TODO sort by closed date
         self._data = df
 
     def get_data_frame(self):
@@ -263,7 +265,6 @@ class LeadCycleTimes:
         try:
             # view all events thru filter: open < event < closed
             # choose earliest event: label, merge request, or assignment
-            # TODO this did not work for https://gitlab.com/gozynta/cwacc/-/issues/400
             nearest, nearest_dt, _ = next(
                 filter(lambda x: x[0] in labels and opened_date < x[1] < closed_date, history)
             )

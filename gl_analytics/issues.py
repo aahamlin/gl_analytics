@@ -109,7 +109,10 @@ class HistoryResolver(AbstractResolver):
     def process(self, issue, res):
         """Sort the events by start time. Add store on HistoryMixin.history"""
         events = self.process_history(res)
-        issue.history.add_events(events)
+        try:
+            issue.history.add_events(events)
+        except AssertionError:
+            _log.error(f"assertion error in {self.__class__} on {issue.issue_id} in {issue.project_id}")
 
     @abstractmethod
     def process_history(self, res):  # pragma: no cover

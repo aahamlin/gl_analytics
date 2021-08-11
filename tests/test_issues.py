@@ -149,6 +149,15 @@ def test_closedbyresolver_records_merge_requests(session):
     )
 
 
+@pytest.mark.usefixtures("get_closed_by_merge_request")
+def test_closedbyresolver_skips_merge_requests_before_opened(session):
+    closed_by_resolver = issues.GitLabClosedByMergeRequestResolver(session)
+    issue = issues.Issue(2, 8273019, datetime.datetime(2021, 3, 14, 12, tzinfo=datetime.timezone.utc))
+    closed_by_resolver.resolve(issue)
+    assert len(issue.history) == 1
+    assert issue.history[0][0] == "opened"
+
+
 @pytest.mark.usefixtures("get_issues_with_label")
 def test_issue_with_typelabel_should_set_type(session):
     repo = issues.GitlabIssuesRepository(session, group="gozynta")
