@@ -322,7 +322,9 @@ class GitLabClosedByMergeRequestResolver(HistoryResolver):
     def process_history(self, res):
         def accumulate_state_events(acc, event):
             start_dt = date_parser.parse(event["created_at"])
-            end_dt = date_parser.parse(event["merged_at"])
+            end_dt = None
+            if "merged_at" in event and event["merged_at"]:
+                end_dt = date_parser.parse(event["merged_at"])
             acc.append(("merge_request", start_dt, end_dt))
             return acc
 
