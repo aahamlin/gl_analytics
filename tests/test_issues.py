@@ -43,6 +43,49 @@ def test_repo_builds_url(session):
     assert repo.url == "groups/gozynta/issues"
 
 
+@pytest.fixture
+def opened():
+    return datetime.datetime(2021, 3, 15, tzinfo=datetime.timezone.utc)
+
+
+@pytest.fixture
+def closed(opened):
+    return opened + datetime.timedelta(days=1)
+
+
+@pytest.fixture
+def issue(opened, closed):
+    issue = issues.Issue(1, 2, opened, issue_type="TypeX")
+    issue.history.add_events([("closed", closed, None)])
+    return issue
+
+
+def test_issue_contains_issue_id(issue):
+    assert issue.issue_id == 1
+
+
+def test_issue_contains_project_id(issue):
+    assert issue.project_id == 2
+
+
+def test_issue_contains_type(issue):
+    assert issue.issue_type == "TypeX"
+
+
+def test_issue_contains_opened_at(opened, issue):
+    assert issue.opened_at == opened
+
+
+def test_issue_contains_closed_at(closed, issue):
+    assert issue.closed_at == closed
+
+
+def test_issue_history_contains_opened_and_closed(opened, closed, issue):
+    expected = [("opened", opened, closed), ("closed", closed, None)]
+    assert len(issue.history) == len(expected)
+    assert all([a == b for a, b in zip(issue.history, expected)])
+
+
 @pytest.mark.usefixtures("get_paged_issues")
 def test_repo_list_pagination(session):
     """Make sure we page correctly.

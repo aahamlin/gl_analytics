@@ -2,7 +2,6 @@
 """
 # import json
 import logging
-from typing import Sequence
 import requests
 
 from abc import ABC, abstractmethod
@@ -15,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 # from datetime import datetime
 from dateutil import parser as date_parser
 from operator import itemgetter
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urljoin
 
 from functools import reduce
 
@@ -388,7 +387,7 @@ class Issue(object):
         return self._history
 
     def __str__(self):  # pragma: no cover
-        return f"Issue(id:{self.issue_id}, " f"p:{self.project_id}, " f"t:{self.issue_type} " f"h:{self.history})"
+        return f"Issue(id:{self.issue_id}, p:{self.project_id}, t:{self.issue_type} h:{self.history})"
 
 
 class History(Sequence):
