@@ -8,6 +8,7 @@ import sys
 from .config import load_config
 from .command import CumulativeFlowCommand, CycleTimeCommand
 
+logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 # logging.getLogger('gl_analytics.utils').setLevel(logging.DEBUG)
 # logging.getLogger("gl_analytics.issues").setLevel(logging.DEBUG)
@@ -96,17 +97,14 @@ def create_parser(config):
     return parser
 
 
-class Main:
-    def __init__(self, args=None):
-        self.config = load_config()
-        parser = create_parser(self.config)
-        prog_args = parser.parse_args(args)
-        self.cmd = prog_args.func(self.config, prog_args)
-
-    def run(self):
-        self.cmd.execute()
+def main(args, config=None):
+    if not config:
+        config = load_config()
+    parser = create_parser(config)
+    prog_args = parser.parse_args(args)
+    cmd = prog_args.func(config, prog_args)
+    cmd.execute()
 
 
 if __name__ == "__main__":  # pragma: no cover
-    logging.basicConfig()
-    Main(args=sys.argv[1:]).run()
+    main(args=sys.argv[1:])
