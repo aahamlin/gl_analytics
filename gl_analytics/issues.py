@@ -2,7 +2,6 @@
 """
 # import json
 import logging
-from typing import Sequence
 import requests
 
 from abc import ABC, abstractmethod
@@ -15,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 # from datetime import datetime
 from dateutil import parser as date_parser
 from operator import itemgetter
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urljoin
 
 from functools import reduce
 

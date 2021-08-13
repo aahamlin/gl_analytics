@@ -37,8 +37,6 @@ class IssueStageTransitions:
 
         # print("Issue:", issue)
         issue_id = issue.issue_id
-        opened = issue.opened_at
-        closed = issue.closed_at
         index_name = "datetime"
         id_name = "id"
         type_name = "type"
