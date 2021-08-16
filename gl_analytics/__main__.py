@@ -28,7 +28,10 @@ DEFAULT_WIP = "In Progress"
 log = logging.getLogger("main")
 
 
-def create_parser(config):
+config = load_config()
+
+
+def create_parser():
 
     parser = argparse.ArgumentParser(prog="gl-analytics", description="Analyze data from GitLab projects")
 
@@ -97,10 +100,8 @@ def create_parser(config):
     return parser
 
 
-def main(args, config=None):
-    if not config:
-        config = load_config()
-    parser = create_parser(config)
+def main(args):
+    parser = create_parser()
     prog_args = parser.parse_args(args)
     cmd = prog_args.func(config, prog_args)
     cmd.execute()
