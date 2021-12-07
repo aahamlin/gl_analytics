@@ -1,12 +1,11 @@
 import datetime
+import logging
 import pandas as pd
 import numpy as np
 
-# from itertools import starmap
-# from collections.abc import Sequence
 from functools import partial, reduce
 
-# from operator import itemgetter
+_log = logging.getLogger(__name__)
 
 
 def build_transitions(issues):
@@ -239,7 +238,13 @@ class LeadCycleTimes:
                     reopened_count += 1
 
             opened_date = update_args[self.opened]
-            closed_date = update_args[self.closed]
+            try:
+                closed_date = update_args[self.closed]
+            except KeyError:
+                _log.exception(
+                    f"assertion error in {self.__class__} on Issue #{issue.issue_id} in Project #{issue.project_id}"
+                )
+                raise
             wip_label, wip_datetime = self._find_nearest_available_work(opened_date, closed_date, issue.history)
             update_args["wip_event"] = wip_label
             update_args["wip"] = wip_datetime

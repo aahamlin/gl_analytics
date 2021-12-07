@@ -14,10 +14,16 @@ $ pipenv run python -m gl_analytics --help
 $ pipenv run python -m gl_analytics --milestone mb_v1.3 --days 30
 ```
 
+You must setup your GitLab Access Token and make it available to your environment in TOKEN variable. An easy way to accomplish this is to create a `dotenv` file named `.env`.
+
+```
+TOKEN={your-access-token-here}
+```
 
 ## Todos
 
 - Create installable (pyproject.toml)
+- Improve access token support
 - Refactor areas marked with XXX comments
 - Add column to cycletime, indicating whether the WIP label existed (if not, we use opened date)
 

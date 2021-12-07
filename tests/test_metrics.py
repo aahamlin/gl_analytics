@@ -845,3 +845,22 @@ def get_item_closed_with_merge_request():
     ]
     issue.history.add_events(history)
     return issue
+
+
+def test_leadcycletime_closed_should_fallback_to_closed_at(stages):
+    obj = LeadCycleTimes([get_item_closed_without_close_state_event()], wip="inprogress", stages=stages)
+    df = obj.get_data_frame()
+    print(df.to_csv())
+    assert all([a == b for a, b in zip(df["lead"].array, [5])])
+    assert all([a == b for a, b in zip(df["cycle"].array, [2])])
+
+
+def get_item_closed_without_close_state_event():
+    openedAt = datetime(2021, 3, 15, 6, tzinfo=timezone.utc)
+    closedAt = datetime(2021, 3, 19, 21, tzinfo=timezone.utc)
+    issue = Issue(1, 2, openedAt, issue_type="Bug", closed_at=closedAt)
+    history = [
+        ("merge_request", openedAt + timedelta(days=3), None),
+    ]
+    issue.history.add_events(history)
+    return issue

@@ -126,6 +126,18 @@ def get_closed_workflow_labels(requests_mock):
 
 
 @pytest.fixture
+def get_empty_resource_events(requests_mock):
+    requests_mock.get(
+        "https://gitlab.com/api/v4/projects/8273019/issues/2/resource_label_events",
+        body=to_bytes("[]"),
+    )
+    requests_mock.get(
+        "https://gitlab.com/api/v4/projects/8273019/issues/2/resource_state_events",
+        body=to_bytes("[]]"),
+    )
+
+
+@pytest.fixture
 def get_closed_by_empty(requests_mock):
     requests_mock.get(
         "https://gitlab.com/api/v4/projects/8273019/issues/2/closed_by", body=to_bytes(TestData.closed_by.empty)
