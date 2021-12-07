@@ -18,7 +18,7 @@ test_e2e:
 	pipenv run python -m $(MODULE) cf
 
 test:
-	PIPENV_DONT_LOAD_ENV=1 pipenv run coverage run --source=$(MODULE) -m pytest
+	pipenv run coverage run --source=$(MODULE) -m pytest
 	pipenv run coverage report -m
 
 .PHONY: all init test test_e2e

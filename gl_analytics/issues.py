@@ -111,7 +111,10 @@ class HistoryResolver(AbstractResolver):
         try:
             issue.history.add_events(events)
         except AssertionError:
-            _log.error(f"assertion error in {self.__class__} on {issue.issue_id} in {issue.project_id}")
+            _log.warning(
+                f"Unable to process events for {self.__class__} on Issue #{issue.issue_id} in Project"
+                f" #{issue.project_id}"
+            )
 
     @abstractmethod
     def process_history(self, res):  # pragma: no cover
@@ -190,8 +193,9 @@ class GitlabIssuesRepository(AbstractRepository):
         issue_id = item["iid"]
         project_id = item["project_id"]
         opened_at = date_parser.parse(item["created_at"])
+        closed_at = date_parser.parse(item["closed_at"]) if "closed_at" in item else None
         issue_type = self._find_type_label(item)
-        issue = Issue(issue_id, project_id, opened_at, issue_type=issue_type)
+        issue = Issue(issue_id, project_id, opened_at, issue_type=issue_type, closed_at=closed_at)
         if self._resolvers:
             self._resolve_fields(issue)
         return issue
@@ -337,13 +341,7 @@ DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 class Issue(object):
-    def __init__(
-        self,
-        issue_id,
-        project_id,
-        opened_at,
-        issue_type=None,
-    ):
+    def __init__(self, issue_id, project_id, opened_at, issue_type=None, closed_at=None):
         """initializes an issue.
 
         label_events: array of tuples containing label:str, created_at:datetime
@@ -351,7 +349,7 @@ class Issue(object):
         self._issue_id = issue_id
         self._project_id = project_id
         self._issue_type = issue_type
-        self._history = History(opened_at)
+        self._history = History(opened_at, closed_at)
 
     @property
     def issue_id(self):
@@ -391,13 +389,18 @@ class Issue(object):
 
 
 class History(Sequence):
-    def __init__(self, opened_at):
+    def __init__(self, opened_at, closed_at=None):
         self._history = []
-        self._history.append(("opened", opened_at, None))
+        events = [("opened", opened_at, None)]
+        if closed_at:
+            events.append(("closed", closed_at, None))
+        self._build_history(events)
 
-    def add_events(self, events):
-        ordered_events = sorted(self._history + events, key=itemgetter(1))
+    def _build_history(self, events):
+        ordered_events = sorted(events, key=itemgetter(1))
         assert ordered_events[0][0] == "opened"
+        # if self._closed_at and ordered_events[-1][0] != "closed":
+        #    ordered_events.append(("closed", self._closed_at, None))
         ordered_events = self._fill_enddate(ordered_events)
         self._history = ordered_events
 
@@ -407,10 +410,23 @@ class History(Sequence):
         max = len(events)
         while cur < max:
             prev = events[cur - 1]
-            if prev[2] is None:
-                events[cur - 1] = (prev[0], prev[1], events[cur][1])
+            events[cur - 1] = (prev[0], prev[1], events[cur][1])
             cur += 1
         return events
+
+    def add_events(self, events):
+        """
+        Add events to the history. This can only be called once.
+        """
+        prev_history = self._history
+
+        get_event_label = itemgetter(0)
+        if any(filter(lambda x: get_event_label(x) == "closed", self._history)) and any(
+            filter(lambda x: get_event_label(x) == "closed", events)
+        ):
+            prev_history = list(filter(lambda x: get_event_label(x) != "closed", self._history))
+
+        self._build_history(prev_history + events)
 
     def __getitem__(self, key):
         return self._history.__getitem__(key)

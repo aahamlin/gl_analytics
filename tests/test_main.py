@@ -21,7 +21,7 @@ def test_main_supports_commands(capsys, cmd):
 
 
 def test_main_require_user_token(monkeypatch):
-    monkeypatch.delitem(m.config, "TOKEN")
+    monkeypatch.delitem(m.config, "TOKEN", raising=False)
     with pytest.raises(KeyError):
         m.main(["cumulativeflow", "-m", "mb_v1.3"])
 
@@ -83,7 +83,7 @@ def test_main_cumulative_flow_exports_default_png(monkeypatch, tmp_path, fake_ti
 
 
 def test_cycletime_requires_user_token(monkeypatch):
-    monkeypatch.delitem(m.config, "TOKEN")
+    monkeypatch.delitem(m.config, "TOKEN", raising=False)
 
     with pytest.raises(KeyError):
         m.main(["cycletime", "-m", "mb_v1.3"])
